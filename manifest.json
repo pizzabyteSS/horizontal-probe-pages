@@ -1,0 +1,9 @@
+{
+  "name": "Web構成プローブ",
+  "short_name": "プローブ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}

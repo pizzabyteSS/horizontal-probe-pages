@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<link rel="manifest" href="manifest.json">
+<title>Web構成プローブ</title>
+<style>
+  body { font-family: -apple-system, "Hiragino Sans", sans-serif; margin: 0; padding: 12px; color: #222; background: #fff; }
+  h1 { font-size: 18px; margin: 0 0 8px; }
+  h2 { font-size: 15px; margin: 16px 0 6px; border-bottom: 1px solid #ccc; }
+  section { margin-bottom: 8px; }
+  button, select, input { font-size: 15px; margin: 3px 4px 3px 0; padding: 6px 10px; }
+  table { border-collapse: collapse; font-size: 13px; }
+  td { border: 1px solid #ddd; padding: 3px 6px; vertical-align: top; word-break: break-all; }
+  #log { white-space: pre-wrap; font-size: 12px; background: #f5f5f5; padding: 8px; max-height: 260px; overflow: auto; }
+  .report-page { page-break-after: always; padding: 16px 0; }
+  .report-page h3 { font-size: 16px; }
+  @media print {
+    .no-print { display: none !important; }
+    .report-page p { font-size: 12pt; line-height: 1.7; }
+  }
+</style>
+</head>
+<body>
+<div class="no-print">
+<h1>Web構成プローブ <span id="modeLabel"></span></h1>
+<p>試験用のダミーです。個人情報を入力しないでください。</p>
+
+<h2>環境（T1・T4）</h2>
+<table id="envTable"></table>
+
+<h2>端末保存（T2・T3・T5・T9）</h2>
+<table id="storeTable"></table>
+<button id="btnSave">今の日時を保存</button>
+<button id="btnClear">保存を消す</button>
+<button id="btnPersist">persist() を要求</button>
+
+<h2>書き出し・読み込み（T6）</h2>
+<button id="btnExport">JSON を書き出す</button>
+<input type="file" id="fileImport" accept="application/json,.json">
+
+<h2>ログイン（T10）</h2>
+<input id="loginId" placeholder="ID" autocomplete="off" autocapitalize="off">
+<input id="loginPw" placeholder="パスワード" type="password" autocomplete="off">
+<button id="btnLogin">ログイン</button>
+<button id="btnLogin10">誤ったパスワードで10件同時</button>
+<div>トークン：<span id="tokenView">なし</span></div>
+
+<h2>計算（T8・T10）</h2>
+<select id="sizeKb"><option value="100">100KB</option><option value="500">500KB</option></select>
+<button id="btnCalc1">1回</button>
+<button id="btnCalc5">5回続けて</button>
+<button id="btnCalc10">10件同時</button>
+<button id="btnNoToken">トークンなし</button>
+<button id="btnFakeToken">でたらめなトークン</button>
+<button id="btnLibDirect">ライブラリ直接呼び出し（案A）</button>
+
+<h2>印刷（T7）</h2>
+<button id="btnPrint">印刷</button>
+
+<h2>記録</h2>
+<button id="btnCopyLog">記録をコピー</button>
+<div id="log"></div>
+</div>
+
+<div id="report"></div>
+
+<script>
+(function () {
+  'use strict';
+  var PROBE_ENDPOINT = 'https://script.google.com/macros/s/AKfycbxZqlUVmNeyJSnlDBykidHFZ83wPRRc99zTS6eVaYQrB3As-hE0im-axXk_ZAIDNSI9zw/exec';
+  var MODE = (typeof google !== 'undefined' && google.script && google.script.run) ? 'A' : 'B';
+  var LS_KEY = 'probe.v1';
+  var LAST_CALL_KEY = 'probe.lastCallAt';
+  var TOKEN_KEY = 'probe.token'; // 試験用：開き直しても T8 の冷えた1回目をログインなしで測れるよう保持
+  var loadedAt = Date.now();
+  var callsSinceLoad = 0;
+  var token = '';
+
+  function $(id) { return document.getElementById(id); }
+  function log(msg) {
+    var line = new Date().toLocaleString('ja-JP') + ' [' + MODE + '] ' + msg;
+    $('log').textContent = line + '\n' + $('log').textContent;
+  }
+  function row(tbl, k, v) {
+    var tr = document.createElement('tr');
+    var a = document.createElement('td'); a.textContent = k;
+    var b = document.createElement('td'); b.textContent = v;
+    tr.appendChild(a); tr.appendChild(b); tbl.appendChild(tr);
+  }
+  function median(arr) {
+    var s = arr.slice().sort(function (x, y) { return x - y; });
+    var m = Math.floor(s.length / 2);
+    return s.length % 2 ? s[m] : Math.round((s[m - 1] + s[m]) / 2);
+  }
+
+  // ---- 通信（案A：google.script.run／案B：fetch） ----
+  function api(action, params) {
+    if (MODE === 'A') {
+      var fn = { login: 'apiLogin', calc: 'apiCalc', ping: 'apiPing' }[action];
+      var args = action === 'login' ? [params.id, params.pw]
+               : action === 'calc' ? [params.token, params.sizeKb] : [];
+      return gs(fn, args);
+    }
+    var body = { action: action };
+    for (var k in params) body[k] = params[k];
+    return fetch(PROBE_ENDPOINT, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+      body: JSON.stringify(body)
+    }).then(function (r) { return r.json(); });
+  }
+  function gs(fn, args) {
+    return new Promise(function (resolve, reject) {
+      var r = google.script.run.withSuccessHandler(resolve).withFailureHandler(reject);
+      if (typeof r[fn] !== 'function') { reject(new Error('呼べない関数: ' + fn)); return; }
+      r[fn].apply(r, args);
+    });
+  }
+
+  // ---- 環境 ----
+  function standaloneState() {
+    var mq = window.matchMedia && window.matchMedia('(display-mode: standalone)').matches;
+    return 'navigator.standalone=' + String(navigator.standalone) + ' / display-mode:standalone=' + String(!!mq);
+  }
+  function renderEnv() {
+    var t = $('envTable'); t.innerHTML = '';
+    var top;
+    try { top = (window.top === window.self) ? '最上位' : 'iframe 内'; } catch (e) { top = 'iframe 内（判定不可）'; }
+    row(t, '方式', MODE === 'A' ? '案A（GAS HtmlService）' : '案B（静的ページ＋fetch）');
+    row(t, 'origin', location.origin);
+    row(t, 'フレーム', top);
+    row(t, '表示モード', standaloneState());
+    row(t, '表示まで（参考）', (Date.now() - (performance.timing ? performance.timing.navigationStart : loadedAt)) + ' ms（このフレームの読み込み開始から。案A は外側の script.google.com を含まないため、T1 は手元で計る）');
+    row(t, 'UA', navigator.userAgent);
+    if (navigator.storage && navigator.storage.persisted) {
+      navigator.storage.persisted().then(function (v) { row(t, 'persisted()', String(v)); });
+    } else {
+      row(t, 'persisted()', 'API なし');
+    }
+  }
+
+  // ---- 端末保存 ----
+  function idb() {
+    return new Promise(function (resolve, reject) {
+      if (!window.indexedDB) { reject(new Error('IndexedDB なし')); return; }
+      var req = indexedDB.open('probe', 1);
+      req.onupgradeneeded = function () { req.result.createObjectStore('kv'); };
+      req.onsuccess = function () { resolve(req.result); };
+      req.onerror = function () { reject(req.error); };
+    });
+  }
+  function idbGet(key) {
+    return idb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var r = db.transaction('kv', 'readonly').objectStore('kv').get(key);
+        r.onsuccess = function () { resolve(r.result); };
+        r.onerror = function () { reject(r.error); };
+      });
+    });
+  }
+  function idbPut(key, val) {
+    return idb().then(function (db) {
+      return new Promise(function (resolve, reject) {
+        var tx = db.transaction('kv', 'readwrite');
+        if (val === undefined) tx.objectStore('kv').delete(key); else tx.objectStore('kv').put(val, key);
+        tx.oncomplete = function () { resolve(); };
+        tx.onerror = function () { reject(tx.error); };
+      });
+    });
+  }
+  function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return 'エラー: ' + e.message; } }
+  function lsSet(k, v) { try { if (v === null) localStorage.removeItem(k); else localStorage.setItem(k, v); return true; } catch (e) { log('localStorage 書き込み失敗: ' + e.message); return false; } }
+
+  function renderStore() {
+    var t = $('storeTable'); t.innerHTML = '';
+    row(t, 'localStorage', lsGet(LS_KEY) || '（なし）');
+    idbGet(LS_KEY).then(function (v) { row(t, 'IndexedDB', v || '（なし）'); },
+                        function (e) { row(t, 'IndexedDB', 'エラー: ' + e.message); });
+  }
+  function snapshot() {
+    return JSON.stringify({ writtenAt: new Date().toISOString(), origin: location.origin, mode: MODE });
+  }
+  $('btnSave').onclick = function () {
+    var v = snapshot();
+    lsSet(LS_KEY, v);
+    idbPut(LS_KEY, v).then(function () { log('保存しました: ' + v); renderStore(); },
+                           function (e) { log('IndexedDB 保存失敗: ' + e.message); renderStore(); });
+  };
+  $('btnClear').onclick = function () {
+    lsSet(LS_KEY, null);
+    idbPut(LS_KEY, undefined).then(function () { log('保存を消しました'); renderStore(); });
+  };
+  $('btnPersist').onclick = function () {
+    if (!(navigator.storage && navigator.storage.persist)) { log('persist() なし'); return; }
+    navigator.storage.persist().then(function (v) { log('persist() → ' + v); renderEnv(); },
+                                     function (e) { log('persist() 失敗: ' + e.message); });
+  };
+
+  // ---- 書き出し・読み込み ----
+  $('btnExport').onclick = function () {
+    try {
+      var data = JSON.stringify({ exportedAt: new Date().toISOString(), stored: lsGet(LS_KEY) }, null, 2);
+      var blob = new Blob([data], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'probe-export.json';
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      log('書き出しを実行（保存できたかは端末で確認）');
+    } catch (e) { log('書き出し失敗: ' + e.message); }
+  };
+  $('fileImport').onchange = function (ev) {
+    var f = ev.target.files && ev.target.files[0];
+    if (!f) return;
+    var rd = new FileReader();
+    rd.onload = function () {
+      var o;
+      try { o = JSON.parse(rd.result); } catch (e) { log('読み込み失敗: ' + e.message); return; }
+      if (!o || typeof o.stored !== 'string') { log('読み込み失敗: stored がありません'); return; }
+      lsSet(LS_KEY, o.stored);
+      idbPut(LS_KEY, o.stored).then(function () { log('読み込み・復元成功: exportedAt=' + o.exportedAt + ' stored=' + o.stored); renderStore(); },
+                                    function (e) { log('IndexedDB への復元失敗: ' + e.message); renderStore(); });
+    };
+    rd.readAsText(f);
+  };
+
+  // ---- ログイン ----
+  $('btnLogin').onclick = function () {
+    var t0 = Date.now();
+    api('login', { id: $('loginId').value, pw: $('loginPw').value }).then(function (r) {
+      if (r.ok) { token = r.token; lsSet(TOKEN_KEY, token); $('tokenView').textContent = token.slice(0, 8) + '…（期限 ' + new Date(r.expiresAt).toLocaleTimeString('ja-JP') + '）'; }
+      log('ログイン → ' + JSON.stringify(r) + '（' + (Date.now() - t0) + ' ms）');
+    }, function (e) { log('ログイン失敗: ' + e.message); });
+  };
+  $('btnLogin10').onclick = function () {
+    var id = $('loginId').value;
+    var ps = [];
+    for (var i = 0; i < 10; i++) ps.push(api('login', { id: id, pw: 'wrong-' + i }).catch(function (e) { return { ok: false, error: e.message }; }));
+    Promise.all(ps).then(function (rs) {
+      var c = {};
+      rs.forEach(function (r) { var k = r.ok ? 'ok' : r.error; c[k] = (c[k] || 0) + 1; });
+      log('誤パスワード10件同時 → ' + JSON.stringify(c) + '。続けて正しいパスワードでログインし、locked になるか確認');
+    });
+  };
+
+  // ---- 計算 ----
+  function calcOnce(tok) {
+    var t0 = Date.now();
+    var last = Number(lsGet(LAST_CALL_KEY) || 0);
+    var idleMin = last ? Math.round((t0 - last) / 60000) : null;
+    var first = callsSinceLoad === 0;
+    callsSinceLoad++;
+    return api('calc', { token: tok, sizeKb: Number($('sizeKb').value) }).then(function (r) {
+      var ms = Date.now() - t0;
+      lsSet(LAST_CALL_KEY, String(Date.now()));
+      var info = r.ok ? ('ok used=' + r.used + '/' + r.limit + ' bytes=' + r.bytes + ' serverMs=' + r.serverMs) : JSON.stringify(r);
+      log('計算 ' + ms + ' ms' + (first ? '【読み込み後1回目】' : '') + (idleMin !== null ? '（前回から ' + idleMin + ' 分）' : '（前回記録なし）') + ' → ' + info);
+      return { ms: ms, r: r };
+    }, function (e) { log('計算失敗: ' + e.message); return { ms: Date.now() - t0, r: { ok: false, error: e.message } }; });
+  }
+  $('btnCalc1').onclick = function () { calcOnce(token); };
+  $('btnCalc5').onclick = function () {
+    var times = [];
+    var p = Promise.resolve();
+    for (var i = 0; i < 5; i++) p = p.then(function () { return calcOnce(token).then(function (x) { times.push(x.ms); }); });
+    p.then(function () { log('5回の中央値 ' + median(times) + ' ms（' + times.join(', ') + '）'); });
+  };
+  $('btnCalc10').onclick = function () {
+    var ps = [];
+    for (var i = 0; i < 10; i++) ps.push(calcOnce(token));
+    Promise.all(ps).then(function (xs) {
+      var ok = xs.filter(function (x) { return x.r.ok; }).length;
+      log('10件同時 → 成功 ' + ok + ' 件');
+    });
+  };
+  $('btnNoToken').onclick = function () { calcOnce(''); };
+  $('btnFakeToken').onclick = function () { calcOnce('00000000-0000-0000-0000-000000000000'); };
+  $('btnLibDirect').onclick = function () {
+    if (MODE !== 'A') { log('案A のみ'); return; }
+    var names = ['dummyCalc', 'libSecret', 'ProbeLib', 'login_', 'calc_'];
+    names.forEach(function (n) {
+      gs(n, []).then(function (r) { log('直接呼び出し ' + n + ' → 呼べた（不合格）: ' + JSON.stringify(r).slice(0, 80)); },
+                     function (e) { log('直接呼び出し ' + n + ' → 拒否: ' + e.message); });
+    });
+  };
+
+  // ---- 印刷 ----
+  function buildReport() {
+    var html = '';
+    for (var i = 1; i <= 4; i++) {
+      html += '<div class="report-page"><h3>ダミー鑑定書 第' + i + '章</h3>';
+      for (var j = 0; j < 6; j++) {
+        html += '<p>【ダミー】これは印刷の見え方を確かめるための試験用の文章です。本番の計算・鑑定文は含みません。文字の大きさ、行間、改ページの位置、余白の崩れがないかを確認してください。</p>';
+      }
+      html += '</div>';
+    }
+    $('report').innerHTML = html;
+  }
+  $('btnPrint').onclick = function () {
+    try { window.print(); log('印刷を実行'); } catch (e) { log('印刷失敗: ' + e.message); }
+  };
+
+  $('btnCopyLog').onclick = function () {
+    var text = $('log').textContent;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(function () { log('記録をコピーしました'); },
+                                               function (e) { log('コピー失敗: ' + e.message); });
+    } else { log('クリップボード API なし'); }
+  };
+
+  $('modeLabel').textContent = MODE === 'A' ? '（案A）' : '（案B）';
+  if (MODE === 'B' && PROBE_ENDPOINT.indexOf('__') === 0) log('案B の呼び先が未設定です');
+  var savedTok = lsGet(TOKEN_KEY);
+  if (savedTok && savedTok.indexOf('エラー') !== 0) { token = savedTok; $('tokenView').textContent = token.slice(0, 8) + '…（保存済み）'; }
+  buildReport();
+  renderEnv();
+  renderStore();
+  log('表示しました（前回の計算から ' + (lsGet(LAST_CALL_KEY) ? Math.round((Date.now() - Number(lsGet(LAST_CALL_KEY))) / 60000) + ' 分' : '記録なし') + '）');
+})();
+</script>
+</body>
+</html>
