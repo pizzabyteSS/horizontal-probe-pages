@@ -29,18 +29,30 @@
 
   <section class="card" aria-labelledby="ttlInput">
     <h2 id="ttlInput" class="card-title">鑑定の入力（計測用の固定値）</h2>
+    <p class="hint">数字は半角でも全角でも入力できます。</p>
+    <h3 class="group-title">生年月日・出生時刻</h3>
+    <p class="hint">生年は西暦（1913〜2068年）。時刻は24時間表記（午後3時は 15）。時刻がわからないときは「時」「分」を空にします。</p>
     <div class="grid">
-      <label class="field">生年<input id="inpYear" inputmode="numeric"></label>
-      <label class="field">月<input id="inpMonth" inputmode="numeric"></label>
-      <label class="field">日<input id="inpDay" inputmode="numeric"></label>
-      <label class="field">時（不明は空）<input id="inpHour" inputmode="numeric"></label>
-      <label class="field">分<input id="inpMin" inputmode="numeric"></label>
+      <label class="field">生年（西暦）<input id="inpYear" inputmode="numeric" placeholder="例 1985"></label>
+      <label class="field">月（1〜12）<input id="inpMonth" inputmode="numeric" placeholder="例 7"></label>
+      <label class="field">日（1〜31）<input id="inpDay" inputmode="numeric" placeholder="例 14"></label>
+      <label class="field">時（0〜23・不明は空）<input id="inpHour" inputmode="numeric" placeholder="例 15"></label>
+      <label class="field">分（0〜59）<input id="inpMin" inputmode="numeric" placeholder="例 30"></label>
+    </div>
+    <h3 class="group-title">そのほか</h3>
+    <p class="hint">出生地は都道府県名（例：東京都・大阪府・北海道）。わからないときは「不明」と入力します。</p>
+    <div class="grid">
       <label class="field">性別<select id="selSex"><option>女性</option><option>男性</option></select></label>
-      <label class="field">出生地<input id="inpBirthPlace"></label>
-      <label class="field">蔵干<select id="selZokanStyle"><option>鳥海流</option><option>黒川式</option></select></label>
-      <label class="field">開始年<input id="inpStartYear" inputmode="numeric"></label>
-      <label class="field">開始月<input id="inpStartMonth" inputmode="numeric"></label>
-      <label class="field">開始日<input id="inpStartDay" inputmode="numeric"></label>
+      <label class="field">出生地<input id="inpBirthPlace" placeholder="例 東京都"></label>
+      <label class="field">蔵干の流派<select id="selZokanStyle"><option>鳥海流</option><option>黒川式</option></select></label>
+    </div>
+    <h3 class="group-title">運勢表の開始日</h3>
+    <p class="hint">年運・月運・日運の表をこの日から作ります。ふつうは鑑定する日（今日）を入れます。生年月日と同じ日かそれより後で、西暦 1913〜2068年。</p>
+    <button id="btnStartToday" class="btn btn-sub" type="button">今日にする</button>
+    <div class="grid">
+      <label class="field">開始年（西暦）<input id="inpStartYear" inputmode="numeric" placeholder="例 2026"></label>
+      <label class="field">開始月（1〜12）<input id="inpStartMonth" inputmode="numeric" placeholder="例 10"></label>
+      <label class="field">開始日（1〜31）<input id="inpStartDay" inputmode="numeric" placeholder="例 1"></label>
     </div>
   </section>
 

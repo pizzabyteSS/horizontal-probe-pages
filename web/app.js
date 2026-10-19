@@ -41,6 +41,20 @@
     not_json: '応答を読めませんでした'
   };
 
+  // 入力の誤りの理由（サーバーの detail。master_gss/web_api.js の _hzValidateWebInput_）
+  var INPUT_ERROR_MESSAGES = {
+    birth_date_invalid: '生年月日が正しくありません（西暦・実在する日付）',
+    start_date_invalid: '開始日が正しくありません（西暦・実在する日付）',
+    start_date_before_birth: '開始日は生年月日と同じ日かそれより後にしてください',
+    hour_invalid: '時は 0〜23 で入力してください',
+    min_invalid: '分は 0〜59 で入力してください',
+    sex_invalid: '性別を選んでください',
+    zokan_style_invalid: '蔵干の流派を選んでください',
+    birth_place_invalid: '出生地が長すぎます',
+    birth_place_unknown: '出生地は都道府県名か「不明」で入力してください',
+    out_of_supported_range: '計算できる範囲（西暦 1913〜2068年）の外です'
+  };
+
   // ---- 状態（メモリだけ） ----
   var session = createEmptySession();
   var isBusy = false;
@@ -67,7 +81,8 @@
 
   function describeError(json) {
     var base = ERROR_MESSAGES[json.error] || ('失敗（' + String(json.error) + '）');
-    return json.detail ? base + '：' + json.detail : base;
+    if (!json.detail) return base;
+    return base + '：' + (INPUT_ERROR_MESSAGES[json.detail] || json.detail);
   }
 
   function describeDisplayMode() {
@@ -132,13 +147,33 @@
     });
   }
 
+  /** 全角の数字・空白を半角にする（入力の案内どおり、全角でも受け付ける）。 */
+  function toHalfWidth(text) {
+    return String(text).replace(/[０-９]/g, function (ch) {
+      return String.fromCharCode(ch.charCodeAt(0) - 0xFEE0);
+    }).replace(/\u3000/g, ' ');
+  }
+
   function readInputForm() {
     var input = {};
     INPUT_FIELDS.forEach(function (field) {
-      var raw = String(byId(field[1]).value).trim();
+      var raw = toHalfWidth(byId(field[1]).value).trim();
       input[field[0]] = (field[2] && raw !== '') ? Number(raw) : raw;
     });
     return input;
+  }
+
+  /** 運勢表の開始日を、この端末の今日（日本時間）にする。 */
+  function fillStartDateToday() {
+    var parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Tokyo', year: 'numeric', month: 'numeric', day: 'numeric' })
+      .formatToParts(new Date());
+    var pick = function (type) {
+      for (var i = 0; i < parts.length; i++) if (parts[i].type === type) return parts[i].value;
+      return '';
+    };
+    byId('inpStartYear').value = String(Number(pick('year')));
+    byId('inpStartMonth').value = String(Number(pick('month')));
+    byId('inpStartDay').value = String(Number(pick('day')));
   }
 
   // ---- 記録 ----
@@ -326,6 +361,7 @@
     byId('btnKanteiOnce').addEventListener('click', handleKanteiOnceClick);
     byId('btnKanteiStreak').addEventListener('click', handleKanteiStreakClick);
     byId('btnCopyRecords').addEventListener('click', handleCopyRecordsClick);
+    byId('btnStartToday').addEventListener('click', fillStartDateToday);
     if (!isEndpointConfigured()) addRecord('設定', null, '', '呼び先が未設定です（tools/web-build.sh でビルドしたものを開いてください）');
     refreshControls();
     window.setInterval(refreshControls, 60000);   // 期限切れになったら表示とボタンを更新する
