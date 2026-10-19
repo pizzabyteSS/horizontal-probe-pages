@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="referrer" content="no-referrer">
+<link rel="manifest" href="manifest.json">
+<link rel="stylesheet" href="app.css">
+<title>四柱推命 Web版（計測用）</title>
+</head>
+<body>
+<main class="page">
+  <h1 class="page-title">四柱推命 Web版 <span class="page-badge">計測用</span></h1>
+  <p class="page-note">応答時間を測るための画面です。氏名は入力しません（サーバーにも送りません）。</p>
+
+  <section class="card" aria-labelledby="ttlReady">
+    <h2 id="ttlReady" class="card-title">画面の表示（T1）</h2>
+    <p>操作できるまで：<strong id="outReadyTime">計測中…</strong></p>
+  </section>
+
+  <section class="card" aria-labelledby="ttlLogin">
+    <h2 id="ttlLogin" class="card-title">ログイン</h2>
+    <label class="field">ID<input id="inpLoginId" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+    <label class="field">パスワード<input id="inpLoginPw" type="password" autocomplete="current-password"></label>
+    <button id="btnLogin" class="btn" type="button">ログイン</button>
+    <p class="status">状態：<span id="outSession">未ログイン</span></p>
+  </section>
+
+  <section class="card" aria-labelledby="ttlInput">
+    <h2 id="ttlInput" class="card-title">鑑定の入力（計測用の固定値）</h2>
+    <div class="grid">
+      <label class="field">生年<input id="inpYear" inputmode="numeric"></label>
+      <label class="field">月<input id="inpMonth" inputmode="numeric"></label>
+      <label class="field">日<input id="inpDay" inputmode="numeric"></label>
+      <label class="field">時（不明は空）<input id="inpHour" inputmode="numeric"></label>
+      <label class="field">分<input id="inpMin" inputmode="numeric"></label>
+      <label class="field">性別<select id="selSex"><option>女性</option><option>男性</option></select></label>
+      <label class="field">出生地<input id="inpBirthPlace"></label>
+      <label class="field">蔵干<select id="selZokanStyle"><option>鳥海流</option><option>黒川式</option></select></label>
+      <label class="field">開始年<input id="inpStartYear" inputmode="numeric"></label>
+      <label class="field">開始月<input id="inpStartMonth" inputmode="numeric"></label>
+      <label class="field">開始日<input id="inpStartDay" inputmode="numeric"></label>
+    </div>
+  </section>
+
+  <section class="card" aria-labelledby="ttlKantei">
+    <h2 id="ttlKantei" class="card-title">計算（T8）</h2>
+    <p class="hint">手順：ログイン → 画面を開いたまま30分以上待つ → 「1回」（冷えた1回目）→「続けて5回」。合計6回使います。</p>
+    <button id="btnKanteiOnce" class="btn" type="button" disabled>1回</button>
+    <button id="btnKanteiStreak" class="btn" type="button" disabled>続けて5回</button>
+  </section>
+
+  <section class="card" aria-labelledby="ttlRecords">
+    <h2 id="ttlRecords" class="card-title">記録</h2>
+    <button id="btnCopyRecords" class="btn btn-sub" type="button">記録をコピー</button>
+    <ol id="outRecords" class="records"></ol>
+  </section>
+</main>
+<script src="config.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,9 @@
+{
+  "name": "四柱推命 Web版（計測用）",
+  "short_name": "四柱推命",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}

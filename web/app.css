@@ -1,0 +1,39 @@
+/* web/src/app.css — Web版 段階1（計測用の最小の画面）。スマホ縦を基準にする */
+:root {
+  --color-text: #1f2328;
+  --color-sub: #59636e;
+  --color-line: #d1d9e0;
+  --color-bg: #ffffff;
+  --color-card: #f6f8fa;
+  --color-accent: #0969da;
+  --color-ok: #1a7f37;
+  --color-ng: #cf222e;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.page { max-width: 720px; margin: 0 auto; padding: 12px 16px 40px; }
+.page-title { font-size: 20px; margin: 4px 0 4px; }
+.page-badge { font-size: 12px; color: var(--color-sub); border: 1px solid var(--color-line); border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
+.page-note, .hint { color: var(--color-sub); font-size: 14px; margin: 4px 0 8px; }
+.card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 8px; padding: 10px 12px; margin: 12px 0; }
+.card-title { font-size: 16px; margin: 0 0 8px; }
+.grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.field { display: block; font-size: 13px; color: var(--color-sub); margin: 0 0 8px; }
+/* iOS Safari は 16px 未満の入力欄でフォーカス時に拡大するため 16px にする */
+.field input, .field select { display: block; width: 100%; font-size: 16px; padding: 6px 8px; margin-top: 2px; border: 1px solid var(--color-line); border-radius: 6px; background: #fff; color: var(--color-text); }
+.btn { font-size: 16px; padding: 8px 16px; margin: 4px 8px 4px 0; border: 0; border-radius: 6px; background: var(--color-accent); color: #fff; }
+.btn:disabled { opacity: 0.4; }
+.btn-sub { background: #fff; color: var(--color-accent); border: 1px solid var(--color-accent); }
+.status { margin: 6px 0 0; font-size: 14px; }
+.records { padding-left: 20px; margin: 8px 0 0; font-size: 14px; word-break: break-word; }
+.records li { margin: 4px 0; }
+.is-ok { color: var(--color-ok); font-weight: bold; }
+.is-ng { color: var(--color-ng); font-weight: bold; }
+.is-note { color: var(--color-sub); font-weight: bold; }
