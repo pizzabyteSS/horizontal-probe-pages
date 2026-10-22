@@ -7,69 +7,283 @@
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="app.css">
-<title>四柱推命 Web版（計測用）</title>
+<title>四柱推命 Web版（試作）</title>
 </head>
 <body>
+<!-- 画面の構成（docs/web-screen-plan.md §4 の「画面の構成」）：ログイン → メニュー →（鑑定する／設定）。
+     1つのページの中で画面（data-screen）を1つずつ出し、ページ内の印（#menu など）で切り替える（ブラウザの戻るで行き来できる） -->
+<header class="app-bar">
+  <a id="lnkMenu" class="app-bar-back" href="#menu" hidden>‹ メニュー</a>
+  <span class="app-bar-title">四柱推命 Web版</span>
+  <span id="outSession" class="app-bar-status">未ログイン</span>
+</header>
 <main class="page">
-  <h1 class="page-title">四柱推命 Web版 <span class="page-badge">計測用</span></h1>
-  <p class="page-note">応答時間を測るための画面です。氏名は入力しません（サーバーにも送りません）。</p>
 
-  <section class="card" aria-labelledby="ttlReady">
-    <h2 id="ttlReady" class="card-title">画面の表示（T1）</h2>
-    <p>操作できるまで：<strong id="outReadyTime">計測中…</strong></p>
-  </section>
-
-  <section class="card" aria-labelledby="ttlLogin">
-    <h2 id="ttlLogin" class="card-title">ログイン</h2>
-    <label class="field">ID<input id="inpLoginId" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
-    <label class="field">パスワード<input id="inpLoginPw" type="password" autocomplete="current-password"></label>
-    <button id="btnLogin" class="btn" type="button">ログイン</button>
-    <p class="status">状態：<span id="outSession">未ログイン</span></p>
-  </section>
-
-  <section class="card" aria-labelledby="ttlInput">
-    <h2 id="ttlInput" class="card-title">鑑定の入力（計測用の固定値）</h2>
-    <p class="hint">数字は半角でも全角でも入力できます。</p>
-    <h3 class="group-title">生年月日・出生時刻</h3>
-    <p class="hint">生年は西暦（1913〜2068年）。時刻は24時間表記（午後3時は 15）。時刻がわからないときは「時」「分」を空にします。</p>
-    <div class="grid">
-      <label class="field">生年（西暦）<input id="inpYear" inputmode="numeric" placeholder="例 1985"></label>
-      <label class="field">月（1〜12）<input id="inpMonth" inputmode="numeric" placeholder="例 7"></label>
-      <label class="field">日（1〜31）<input id="inpDay" inputmode="numeric" placeholder="例 14"></label>
-      <label class="field">時（0〜23・不明は空）<input id="inpHour" inputmode="numeric" placeholder="例 15"></label>
-      <label class="field">分（0〜59）<input id="inpMin" inputmode="numeric" placeholder="例 30"></label>
-    </div>
-    <h3 class="group-title">そのほか</h3>
-    <p class="hint">出生地は都道府県名（例：東京都・大阪府・北海道）。わからないときは「不明」と入力します。</p>
-    <div class="grid">
-      <label class="field">性別<select id="selSex"><option>女性</option><option>男性</option></select></label>
-      <label class="field">出生地<input id="inpBirthPlace" placeholder="例 東京都"></label>
-      <label class="field">蔵干の流派<select id="selZokanStyle"><option>鳥海流</option><option>黒川式</option></select></label>
-    </div>
-    <h3 class="group-title">運勢表の開始日</h3>
-    <p class="hint">年運・月運・日運の表をこの日から作ります。ふつうは鑑定する日（今日）を入れます。生年月日と同じ日かそれより後で、西暦 1913〜2068年。</p>
-    <button id="btnStartToday" class="btn btn-sub" type="button">今日にする</button>
-    <div class="grid">
-      <label class="field">開始年（西暦）<input id="inpStartYear" inputmode="numeric" placeholder="例 2026"></label>
-      <label class="field">開始月（1〜12）<input id="inpStartMonth" inputmode="numeric" placeholder="例 10"></label>
-      <label class="field">開始日（1〜31）<input id="inpStartDay" inputmode="numeric" placeholder="例 1"></label>
+  <!-- ログイン（ログインしていないときは、どの画面を開いてもここを出す） -->
+  <section id="scrLogin" class="screen" data-screen="login" aria-labelledby="ttlLogin">
+    <div class="card">
+      <h2 id="ttlLogin" class="card-title">ログイン</h2>
+      <label class="field">ID<input id="inpLoginId" autocomplete="username" autocapitalize="off" spellcheck="false"></label>
+      <label class="field">パスワード<input id="inpLoginPw" type="password" autocomplete="current-password"></label>
+      <button id="btnLogin" class="btn" type="button">ログイン</button>
+      <button id="btnLoginBack" class="btn btn-sub" type="button" hidden>鑑定の画面に戻る</button>
+      <p id="outLoginMessage" class="message" role="status" aria-live="polite"></p>
+      <a class="link-terms" href="#terms">利用規約・プライバシーポリシー</a>
     </div>
   </section>
 
-  <section class="card" aria-labelledby="ttlKantei">
-    <h2 id="ttlKantei" class="card-title">計算（T8）</h2>
-    <p class="hint">手順：ログイン → 画面を開いたまま30分以上待つ → 「1回」（冷えた1回目）→「続けて5回」。合計6回使います。</p>
-    <button id="btnKanteiOnce" class="btn" type="button" disabled>1回</button>
-    <button id="btnKanteiStreak" class="btn" type="button" disabled>続けて5回</button>
+  <!-- 同意（ログインした ID が、いまの版の利用規約・プライバシーポリシーに同意していないときに出す。印では開かない） -->
+  <section id="scrAgree" class="screen" data-screen="agree" aria-labelledby="ttlAgree" hidden>
+    <div class="card">
+      <h2 id="ttlAgree" class="card-title">利用規約とプライバシーポリシー</h2>
+      <p class="hint">はじめてお使いになるとき（または内容を改めたとき）は、全文をお読みいただき、いちばん下の「同意する」を押してください。同意いただくまで鑑定はできません。</p>
+      <div id="outAgreeTerms"></div>
+      <div class="agree-actions">
+        <button id="btnAgree" class="btn" type="button">同意する</button>
+        <button id="btnAgreeDecline" class="btn btn-sub" type="button">同意しない（ログインをやめる）</button>
+        <p id="outAgreeMessage" class="message" role="status" aria-live="polite"></p>
+      </div>
+    </div>
   </section>
 
-  <section class="card" aria-labelledby="ttlRecords">
-    <h2 id="ttlRecords" class="card-title">記録</h2>
-    <button id="btnCopyRecords" class="btn btn-sub" type="button">記録をコピー</button>
-    <ol id="outRecords" class="records"></ol>
+  <!-- メニュー -->
+  <section id="scrMenu" class="screen" data-screen="menu" aria-labelledby="ttlMenu" hidden>
+    <h2 id="ttlMenu" class="screen-title">メニュー</h2>
+    <nav class="menu" aria-label="メニュー">
+      <a class="menu-item" href="#kantei"><span class="menu-item-title">鑑定する</span><span class="menu-item-note">入力 → 計算結果 → 鑑定書 → 送る・印刷</span><span class="menu-item-detail">お客さまの氏名・生年月日・出生時刻などを入れると、命式・大運〜日運の表と鑑定書（第1〜8章）ができます。鑑定書の文を直して、相手には PDF で送り、自分用の記録も残せます。</span></a>
+      <a class="menu-item" href="#settings"><span class="menu-item-title">設定</span><span class="menu-item-note">デザインを変える・マニュアル</span><span class="menu-item-detail">鑑定書と画面に出す屋号・ロゴ・色・書体を決めます。使い方の説明もここにあります。</span></a>
+    </nav>
+    <section id="secDraft" class="card" aria-labelledby="ttlDraft" hidden>
+      <h3 id="ttlDraft" class="card-title">作業中の鑑定</h3>
+      <p id="outDraftStatus" class="status"></p>
+      <button id="btnDraftOpen" class="btn" type="button" hidden>開く</button>
+      <button id="btnDraftResume" class="btn" type="button" hidden>続きから</button>
+      <button id="btnDraftClear" class="btn btn-sub" type="button" hidden>作業中の鑑定を消す</button>
+      <p id="outDraftMessage" class="message" role="status" aria-live="polite"></p>
+      <ol id="outDraftRecordParts" class="record-parts"></ol>
+      <p class="hint">最後に扱った鑑定1件は、消すまでこの端末に残ります（ほかの端末・サーバーには残りません）。長く空けるときは、先に「自分用の記録を残す」で記録を送っておいてください（Safari が端末の保存を消すことがあります）。</p>
+    </section>
+  </section>
+
+  <!-- 鑑定する：1ページを上から下へ（入力 → 計算結果 → 鑑定書 → 送る・印刷）。上の目次で同じページの中を移動する -->
+  <section id="scrKantei" class="screen" data-screen="kantei" aria-labelledby="ttlKanteiScreen" hidden>
+    <h2 id="ttlKanteiScreen" class="screen-title">鑑定する</h2>
+    <nav id="navToc" class="toc" aria-label="このページの目次" hidden>
+      <button class="toc-item" type="button" data-scroll-to="secInput">入力</button>
+      <span class="toc-sep" aria-hidden="true"></span>
+      <button class="toc-item toc-calc" type="button" data-scroll-to="ttlMeishiki">命式詳細</button>
+      <button class="toc-item toc-calc" type="button" data-scroll-to="ttlTaiun">大運表</button>
+      <button class="toc-item toc-calc" type="button" data-scroll-to="ttlNenun">年運表</button>
+      <button class="toc-item toc-calc" type="button" data-scroll-to="ttlGetsuun">月運表</button>
+      <button class="toc-item toc-calc" type="button" data-scroll-to="ttlNichiun">日運表</button>
+      <span class="toc-sep" aria-hidden="true"></span>
+      <button class="toc-item toc-report" type="button" data-scroll-to="secReport">鑑定書</button>
+      <span class="toc-sep" aria-hidden="true"></span>
+      <button class="toc-item" type="button" data-scroll-to="secSend">送る・印刷</button>
+    </nav>
+
+    <section id="secInput" class="card" aria-labelledby="ttlInput">
+      <h3 id="ttlInput" class="card-title">入力</h3>
+      <label class="field">氏名（画面の表示だけに使い、サーバーには送りません）<input id="inpName" autocomplete="off" placeholder="例 山田 花子"></label>
+      <h4 class="group-title">生年月日・出生時刻</h4>
+      <p class="hint">生年は西暦（1913〜2068年）で、数字は半角でも全角でも入れられます。時刻は24時間表記（午後3時は 15時）。時刻がわからないときは「時」「分」を「不明」にします。</p>
+      <div class="grid">
+        <label class="field">生年（西暦）<input id="inpYear" inputmode="numeric" placeholder="例 1985"></label>
+        <label class="field">月<select id="inpMonth" data-range="1-12" data-unit="月"></select></label>
+        <label class="field">日<select id="inpDay" data-range="1-31" data-unit="日"></select></label>
+      </div>
+      <div class="grid grid-time">
+        <label class="field">時<select id="inpHour" data-range="0-23" data-unit="時" data-unknown="不明"></select></label>
+        <label class="field">分<select id="inpMin" data-range="0-59" data-unit="分" data-unknown="不明"></select></label>
+      </div>
+      <h4 class="group-title">そのほか</h4>
+      <p class="hint">出生地は都道府県名（例：東京都・大阪府・北海道）。わからないときは「不明」と入力します。</p>
+      <div class="grid">
+        <label class="field">性別<select id="selSex"><option>女性</option><option>男性</option></select></label>
+        <label class="field">出生地<input id="inpBirthPlace" placeholder="例 東京都"></label>
+        <label class="field">蔵干の流派<select id="selZokanStyle"><option>鳥海流</option><option>黒川式</option></select></label>
+      </div>
+      <h4 class="group-title">運勢表の開始日</h4>
+      <p class="hint">年運・月運・日運の表をこの日から作ります。ふつうは鑑定する日（今日）を入れます。生年月日と同じ日かそれより後で、西暦 1913〜2068年。</p>
+      <button id="btnStartToday" class="btn btn-sub" type="button">今日にする</button>
+      <div class="grid">
+        <label class="field">開始年（西暦）<input id="inpStartYear" inputmode="numeric" placeholder="例 2026"></label>
+        <label class="field">開始月<select id="inpStartMonth" data-range="1-12" data-unit="月"></select></label>
+        <label class="field">開始日<select id="inpStartDay" data-range="1-31" data-unit="日"></select></label>
+      </div>
+      <button id="btnKanteiOnce" class="btn btn-main" type="button" disabled>鑑定する</button>
+      <p id="outKanteiMessage" class="message" role="status" aria-live="polite"></p>
+      <p id="outReloginNote" class="message is-ng" hidden>ログインの期限が切れました。鑑定するには、ログインし直してください（画面の結果はそのまま残ります）。
+        <button id="btnRelogin" class="btn btn-sub" type="button">ログインし直す</button></p>
+    </section>
+
+    <!-- 鑑定結果：計算結果（表の見た目）と鑑定書（紙の見た目）を分ける。鑑定書だけ送ることもあるため（2026-10-21） -->
+    <div id="secResult" class="result-area" hidden>
+    <section id="secCalc" class="card zone-calc" aria-labelledby="ttlResult">
+      <h3 id="ttlResult" class="zone-title">計算結果</h3>
+      <div id="outInfo" class="result"></div>
+      <h3 id="ttlMeishiki" class="result-group-title">命式詳細</h3>
+      <div id="outMeishiki" class="result"></div>
+      <div class="fortune-group">
+        <h3 id="ttlTaiun" class="result-group-title">大運表</h3>
+        <div id="outTaiun" class="result"></div>
+      </div>
+      <div class="fortune-group">
+        <h3 id="ttlNenun" class="result-group-title">年運表</h3>
+        <div id="outNenun" class="result"></div>
+      </div>
+      <div class="fortune-group">
+        <h3 id="ttlGetsuun" class="result-group-title">月運表</h3>
+        <div id="outGetsuun" class="result"></div>
+      </div>
+      <div class="fortune-group">
+        <h3 id="ttlNichiun" class="result-group-title">日運表</h3>
+        <div id="outNichiun" class="result"></div>
+      </div>
+    </section>
+
+    <section id="secReport" class="zone-report" aria-labelledby="ttlReport">
+      <div id="outBrandBar" class="brand-bar" hidden><img id="imgBrandBarLogo" class="brand-bar-logo" alt="" hidden><span id="outBrandBarName" class="brand-bar-name"></span></div>
+      <h3 id="ttlReport" class="report-title">鑑定書</h3>
+      <p id="outReportCount" class="report-count"></p>
+      <p class="hint result-hint">各文の下の「書き直す」で直せます。直した文には「原文を見る」（元の文を並べて見る）と「原文に戻す」が出ます。送る・印刷には直した後の文が載ります。</p>
+      <div id="outReport" class="result"></div>
+      <p id="outReportCountEnd" class="report-count-end"></p>
+    </section>
+    </div>
+
+    <section id="secSend" class="card" aria-labelledby="ttlSend" hidden>
+      <h3 id="ttlSend" class="card-title">送る・印刷</h3>
+      <p class="hint">ここでは次の3つをします。</p>
+      <ol class="hint send-steps">
+        <li>相手に渡す項目を選ぶ</li>
+        <li>相手に渡す（PDF を作って送る、または印刷する）</li>
+        <li>自分用の記録を残す（メモを付けて、自分宛てに送る）</li>
+      </ol>
+
+      <h4 class="group-title">① 相手に渡す項目を選ぶ</h4>
+      <p class="hint">チェックした項目だけが、相手に渡す PDF・印刷に入ります（本文の各項目の「閉じる」と同じです。鑑定情報は外せません）。</p>
+      <button id="btnReportOnly" class="btn btn-sub" type="button">鑑定書だけにする</button>
+      <div id="outSendItems" class="send-groups"></div>
+
+      <h4 class="group-title">② 相手に渡す</h4>
+      <p class="hint">PDF を作って送るか、印刷して渡します。PDF を作ると「共有する」（スマホの共有画面で LINE・メールなどを選ぶ）と「保存する」（端末にファイルを残す）が出ます。</p>
+      <button id="btnMakeFiles" class="btn" type="button">相手に渡す PDF を作る</button>
+      <button id="btnCancelMake" class="btn btn-sub" type="button" hidden>やめる</button>
+      <p id="outMakeMessage" class="message" role="status" aria-live="polite"></p>
+      <button id="btnShareFiles" class="btn" type="button" hidden>共有する</button>
+      <ul id="outDownloadLinks" class="download-links" hidden></ul>
+      <button id="btnMarkSent" class="btn btn-sub" type="button" hidden>相手に送った</button>
+      <p id="outSentStatus" class="status"></p>
+      <p class="hint">印刷：相手に渡す PDF と同じ項目を印刷します（メモは入りません）。</p>
+      <button id="btnPrint" class="btn btn-sub" type="button">印刷する</button>
+
+      <h4 class="group-title">③ 自分用の記録を残す</h4>
+      <p class="hint">鑑定の全文を、LINE・メールで自分宛てに送っておけます。あとで氏名や生年月日で検索して使えます。</p>
+      <label class="field">メモ（鑑定書の PDF・印刷には入りません。記録の最後にだけ入ります）<textarea id="inpMemo" rows="4"></textarea></label>
+      <p class="hint">送り方を選ぶと、送る文章が下に出ます。</p>
+      <button id="btnMakeRecord" class="btn" type="button">LINE で送る（数通に分ける）</button>
+      <button id="btnMakeRecordMail" class="btn" type="button">メールで送る（1通にまとめる）</button>
+      <p id="outRecordMessage" class="message" role="status" aria-live="polite"></p>
+      <ol id="outRecordParts" class="record-parts"></ol>
+      <button id="btnClearWorkAfterRecord" class="btn btn-sub" type="button" hidden>この鑑定を端末から消す</button>
+    </section>
+  </section>
+
+  <!-- 設定 -->
+  <section id="scrSettings" class="screen" data-screen="settings" aria-labelledby="ttlSettings" hidden>
+    <h2 id="ttlSettings" class="screen-title">設定</h2>
+    <nav class="menu" aria-label="設定">
+      <a class="menu-item" href="#design"><span class="menu-item-title">デザインを変える</span><span class="menu-item-note">屋号・ロゴ・色・書体</span><span class="menu-item-detail">相手に送る鑑定書（PDF）の各ページの上と、画面の鑑定書に出す屋号・ロゴと、見出しの色を決めます。見本を見ながら選べます。</span></a>
+      <a class="menu-item" href="#manual"><span class="menu-item-title">マニュアル</span><span class="menu-item-note">使い方の説明</span><span class="menu-item-detail">鑑定のしかた、鑑定書の直し方、相手への送り方、自分用の記録の残し方を説明します。</span></a>
+      <a class="menu-item" href="#terms"><span class="menu-item-title">利用規約・プライバシーポリシー</span><span class="menu-item-note">同意いただいた内容</span><span class="menu-item-detail">ご利用の条件と、当方が記録する情報・記録しない情報を、いつでも読み返せます。</span></a>
+    </nav>
+  </section>
+
+  <!-- デザインを変える（屋号・ロゴ・色。この端末だけの設定） -->
+  <section id="scrDesign" class="screen" data-screen="design" aria-labelledby="ttlBrand" hidden>
+    <section id="secBrand" class="card">
+      <h2 id="ttlBrand" class="card-title">デザインを変える（屋号・ロゴ・色・書体）</h2>
+      <p class="hint">相手に送る鑑定書（PDF）の各ページの上と、画面の鑑定書・印刷の上に出します。色は画面の上の帯・見出し・表の見出しと、鑑定書の見出しに使います。この端末（ブラウザ）にだけ残り、サーバーには送りません。</p>
+      <div class="brand-sample" aria-label="見本">
+        <p class="brand-sample-label">見本（いまの設定）</p>
+        <div class="brand-sample-paper">
+          <div class="brand-sample-head"><img id="imgBrandSampleLogo" class="brand-sample-logo" alt="" hidden><span id="outBrandSampleName" class="brand-sample-name"></span><span class="brand-sample-right">（お客さまの氏名）様　鑑定日</span></div>
+          <p class="brand-sample-title">第1章｜性格と才能</p>
+          <table class="result-table brand-sample-table"><thead><tr><th>主項目</th><th>診断結果</th></tr></thead><tbody><tr><th>日干</th><td>甲</td></tr></tbody></table>
+        </div>
+      </div>
+      <label class="field">屋号（40字まで）<input id="inpBrandName" autocomplete="off" maxlength="40" placeholder="例 星読みサロン"></label>
+      <label class="field">屋号の書体<select id="selBrandFont"></select></label>
+      <label class="field">ロゴの画像（写真・画像から選べます）<input id="inpBrandLogo" type="file" accept="image/*"></label>
+      <p class="hint">横長の画像が見やすく、横 600 × 縦 240 ピクセル程度が目安です（大きい画像は自動で縮めます）。PNG・JPEG・HEIC（iPhone の写真）などが使えます。</p>
+      <img id="imgBrandLogoPreview" class="brand-logo-preview" alt="いまのロゴ" hidden>
+      <button id="btnBrandLogoClear" class="btn btn-sub" type="button" hidden>ロゴを削除する</button>
+      <label class="field">色<select id="selBrandColor"></select></label>
+      <p id="outBrandMessage" class="message" role="status" aria-live="polite"></p>
+    </section>
+  </section>
+
+  <!-- マニュアル（下書き。あとで直す） -->
+  <section id="scrManual" class="screen" data-screen="manual" aria-labelledby="ttlManual" hidden>
+    <article class="card manual">
+      <h2 id="ttlManual" class="card-title">マニュアル</h2>
+      <h3>1. 鑑定する</h3>
+      <p>メニューの「鑑定する」を開き、生年月日・出生時刻・性別・出生地・蔵干の流派・運勢表の開始日を入れて「鑑定する」を押します。開始日はふつう鑑定する日（「今日にする」で入ります）です。氏名は画面と鑑定書に出すだけで、サーバーには送りません。</p>
+      <p>結果は同じページの下に、命式詳細・大運表・年運表・月運表・日運表・鑑定書（第1〜8章）の順に並びます。上の目次を押すと、その場所へ移ります。</p>
+      <h3>2. 鑑定書を整える</h3>
+      <p>相手に見せない項目は、ページの下の「送る・印刷」の「① 相手に渡す項目を選ぶ」でまとめて外せます（「鑑定書だけにする」もあります）。本文の各項目の「閉じる」でも外せます。鑑定書の文は「書き直す」で直せます。「原文を見る」で元の文を並べて見られ、「原文に戻す」で元に戻ります。各文の字数と、鑑定書の字数（項目・鑑定文・合計。項目名と見出しは数えません）が出ます。鑑定書の最後にも字数が載り、印刷・PDF にも入ります。</p>
+      <h3>3. 送る・印刷</h3>
+      <p>ページのいちばん下の「送る・印刷」は、① 相手に渡す項目を選ぶ、② 相手に渡す、③ 自分用の記録を残す、の順です。②では「相手に渡す PDF を作る」を押し、「共有する」（LINE・メールなど）か「保存する」で相手に送ります。同じ項目を印刷することもできます。送ったら「相手に送った」を押すと、その時点の控えが残ります。「自分用の記録を残す」では、鑑定の全文とメモを LINE・メールで自分宛てに送れます（LINE は数通に分け、メールは1通にまとめます）。相手に送らない項目には【相手に送らない項目】の印が付きます。メモは記録にだけ入り、相手には送りません。</p>
+      <h3>4. 作業中の鑑定（続きから）</h3>
+      <p>最後に扱った鑑定1件は、消すまでこの端末に残ります。画面を閉じても、メニューの「作業中の鑑定」の「続きから」で、閉じた項目・書き直し・メモ・控えごと再開できます。新しく鑑定すると置き換わります（先に確かめます）。顧客の一覧や鑑定の履歴はアプリに残らないため、記録は「自分用の記録を残す」で残してください。</p>
+      <h3>5. 複数の画面（タブ）で使うとき</h3>
+      <p>画面（タブ）を何枚開いても使えます。端末に残る作業中の鑑定は1件だけのため、別の画面で新しく鑑定すると、前の画面の鑑定は端末に残らなくなります（その画面にそう出ます）。続けるときは先に「自分用の記録を残す」で記録を送ってください。</p>
+      <h3>6. デザインを変える</h3>
+      <p>「設定」の「デザインを変える」で、屋号・ロゴ・色・書体を決めます。見本で見た目を確かめられます。鑑定書の各ページと画面の鑑定書に出ます。設定はこの端末にだけ残ります。</p>
+      <h3>7. ログイン</h3>
+      <p>ログインは画面を開くたびに必要です（パスワードは端末に残しません）。途中で期限が切れても画面の結果は消えません。「ログインし直す」で続けられます。初めてログインしたときと、利用規約・プライバシーポリシーを改めたときは、全文をお読みいただき「同意する」を押してください（同意するまで鑑定はできません）。規約・ポリシーは「設定」とログインの画面からいつでも読めます。</p>
+    </article>
+  </section>
+
+  <!-- 利用規約・プライバシーポリシー（ログインの前でも読める。ログイン画面と「設定」から開く） -->
+  <section id="scrTerms" class="screen" data-screen="terms" aria-labelledby="ttlTerms" hidden>
+    <div class="card">
+      <h2 id="ttlTerms" class="card-title">利用規約・プライバシーポリシー</h2>
+      <div id="outTermsDoc"></div>
+    </div>
+  </section>
+
+  <!-- 計測（公開前の確認用。メニューには出さない。ページの印 #measure で開く） -->
+  <section id="scrMeasure" class="screen" data-screen="measure" aria-labelledby="ttlMeasure" hidden>
+    <section class="card">
+      <h2 id="ttlMeasure" class="card-title">計測（公開前の確認用）</h2>
+      <p>画面の表示（T1）・操作できるまで：<strong id="outReadyTime">計測中…</strong></p>
+      <p class="hint">T8 の手順：ログイン → 画面を開いたまま30分以上待つ → 「鑑定する」（冷えた1回目）→「続けて5回」。合計6回使います。結果は「鑑定する」の画面に出ます。</p>
+      <button id="btnKanteiStreak" class="btn" type="button" disabled>続けて5回</button>
+      <button id="btnCopyRecords" class="btn btn-sub" type="button">記録をコピー</button>
+      <ol id="outRecords" class="records"></ol>
+    </section>
   </section>
 </main>
 <script src="config.js"></script>
+<script src="data_table.js"></script>
+<script src="view_common.js"></script>
+<script src="view_meishiki.js"></script>
+<script src="view_chart.js"></script>
+<script src="view_fortune.js"></script>
+<script src="view_report.js"></script>
+<script src="view_result.js"></script>
+<script src="text_edit.js"></script>
+<script src="record_text.js"></script>
+<script src="work_draft.js"></script>
+<script src="brand.js"></script>
+<script src="terms.js"></script>
+<script src="pdf_layout.js"></script>
+<script src="pdf_draw.js"></script>
+<script src="pdf_writer.js"></script>
+<script src="pdf_document.js"></script>
+<script src="send_panel.js"></script>
 <script src="app.js"></script>
 </body>
 </html>

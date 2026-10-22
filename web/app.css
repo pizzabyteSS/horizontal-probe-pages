@@ -1,4 +1,4 @@
-/* web/src/app.css — Web版 段階1（計測用の最小の画面）。スマホ縦を基準にする */
+/* web/src/app.css — Web版の画面。スマホ縦を基準にし、広い画面では表を広げて見せる */
 :root {
   --color-text: #1f2328;
   --color-sub: #59636e;
@@ -8,6 +8,11 @@
   --color-accent: #0969da;
   --color-ok: #1a7f37;
   --color-ng: #cf222e;
+  --color-paper: #ffffff;
+  --color-paper-line: #e6e1d6;
+  --color-closed-bg: #fff6e0;
+  --color-closed-line: #d4a72c;
+  --font-report: "Hiragino Mincho ProN", "Yu Mincho", "YuMincho", "Noto Serif JP", serif;
 }
 * { box-sizing: border-box; }
 body {
@@ -18,23 +23,203 @@ body {
   font-size: 16px;
   line-height: 1.5;
 }
-.page { max-width: 720px; margin: 0 auto; padding: 12px 16px 40px; }
-.page-title { font-size: 20px; margin: 4px 0 4px; }
-.page-badge { font-size: 12px; color: var(--color-sub); border: 1px solid var(--color-line); border-radius: 4px; padding: 1px 6px; vertical-align: middle; }
-.page-note, .hint { color: var(--color-sub); font-size: 14px; margin: 4px 0 8px; }
+.page { max-width: 720px; margin: 0 auto; padding: 4px 16px 40px; }
+.hint { color: var(--color-sub); font-size: 14px; margin: 4px 0 8px; }
+/* 画面の上の帯（どの画面にも出す。メニューへ戻る・ログインの状態）。色を決めたら帯をその色で塗る */
+.app-bar { position: sticky; top: env(safe-area-inset-top, 0px); z-index: 10; display: flex; align-items: center; gap: 8px; height: 44px; padding: 0 16px; white-space: nowrap; background: var(--color-card); border-bottom: 3px solid var(--color-brand, var(--color-line)); }
+.app-bar-back { flex: none; font-size: 15px; color: var(--color-accent); text-decoration: none; padding: 4px 8px 4px 0; }
+.app-bar-back[hidden] { display: none; }
+.app-bar-title { flex: 1; font-weight: bold; font-size: 16px; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.app-bar-status { flex: 0 1 auto; font-size: 12px; color: var(--color-sub); text-align: right; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+html[data-brand-color] .app-bar { background: var(--color-brand); border-bottom-color: var(--color-brand); }
+html[data-brand-color] .app-bar-title, html[data-brand-color] .app-bar-back, html[data-brand-color] .app-bar-status { color: #fff; }
+/* 画面（1つずつ出す） */
+.screen[hidden] { display: none; }
+.screen-title { font-size: 20px; margin: 12px 0 4px; color: var(--color-brand, var(--color-text)); }
+/* メニュー：大きめの押す場所を縦に並べる */
+.menu { display: grid; gap: 8px; margin: 12px 0; }
+.menu-item { display: block; padding: 14px 16px; background: #fff; border: 1px solid var(--color-line); border-left: 6px solid var(--color-brand, var(--color-accent)); border-radius: 8px; color: var(--color-text); text-decoration: none; }
+.menu-item-title { display: block; font-size: 18px; font-weight: bold; }
+.menu-item-note { display: block; font-size: 13px; color: var(--color-sub); margin-top: 2px; }
+/* 「鑑定する」の目次（上の帯の下に止める。押すと同じページの中を移る） */
+.toc { position: sticky; top: calc(47px + env(safe-area-inset-top, 0px));   /* 上の帯（44px＋線 3px）の下 */
+   z-index: 9; display: flex; gap: 4px; overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 8px -16px; padding: 6px 16px; background: var(--color-bg); border-bottom: 1px solid var(--color-line); }
+.toc[hidden] { display: none; }
+.toc-sep { flex: none; width: 1px; margin: 4px 2px; background: var(--color-line); }
+.toc-item.toc-report { background: var(--color-brand, var(--color-accent)); color: #fff; }
+.toc-item { flex: none; font-size: 13px; padding: 4px 10px; border: 1px solid var(--color-brand, var(--color-accent)); border-radius: 14px; background: #fff; color: var(--color-brand, var(--color-accent)); }
+#scrKantei .card, .result-group-title { scroll-margin-top: 100px; }   /* 目次で移ったとき、上の帯と目次に隠れない */
 .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 8px; padding: 10px 12px; margin: 12px 0; }
 .card-title { font-size: 16px; margin: 0 0 8px; }
 .group-title { font-size: 14px; margin: 12px 0 2px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+/* 時・分は狭いスマホでも同じ行に並べる（広い幅では他の行と同じ列幅） */
+.grid-time { grid-template-columns: repeat(auto-fill, minmax(min(140px, calc(50% - 4px)), 1fr)); }
 .field { display: block; font-size: 13px; color: var(--color-sub); margin: 0 0 8px; }
 /* iOS Safari は 16px 未満の入力欄でフォーカス時に拡大するため 16px にする */
-.field input, .field select { display: block; width: 100%; font-size: 16px; padding: 6px 8px; margin-top: 2px; border: 1px solid var(--color-line); border-radius: 6px; background: #fff; color: var(--color-text); }
+.field input, .field select, .field textarea { display: block; width: 100%; font-size: 16px; padding: 6px 8px; margin-top: 2px; border: 1px solid var(--color-line); border-radius: 6px; background: #fff; color: var(--color-text); }
 .btn { font-size: 16px; padding: 8px 16px; margin: 4px 8px 4px 0; border: 0; border-radius: 6px; background: var(--color-accent); color: #fff; }
 .btn:disabled { opacity: 0.4; }
 .btn-sub { background: #fff; color: var(--color-accent); border: 1px solid var(--color-accent); }
+.btn-main { display: block; width: 100%; margin: 12px 0 4px; padding: 12px 16px; font-size: 18px; }
+.btn[hidden] { display: none; }
 .status { margin: 6px 0 0; font-size: 14px; }
 .records { padding-left: 20px; margin: 8px 0 0; font-size: 14px; word-break: break-word; }
 .records li { margin: 4px 0; }
+.message { margin: 6px 0 0; font-size: 14px; min-height: 1em; }
 .is-ok { color: var(--color-ok); font-weight: bold; }
 .is-ng { color: var(--color-ng); font-weight: bold; }
 .is-note { color: var(--color-sub); font-weight: bold; }
+.card-title { color: var(--color-brand, var(--color-text)); }
+/* マニュアル */
+.manual h3 { font-size: 15px; margin: 14px 0 4px; color: var(--color-brand, var(--color-text)); }
+.manual p { margin: 4px 0; font-size: 14px; line-height: 1.7; }
+/* 利用規約・プライバシーポリシー（同意の画面と、いつでも読める画面。terms.js が書く） */
+.terms + .terms { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+.terms-title { font-size: 17px; margin: 4px 0 8px; color: var(--color-brand, var(--color-text)); }
+.terms-heading { font-size: 15px; margin: 14px 0 4px; }
+.terms-text, .terms-list { margin: 4px 0; font-size: 14px; line-height: 1.7; }
+.terms-list { padding-left: 1.6em; }
+.terms-list .terms-list { margin: 2px 0; }
+.terms-lead { margin: 4px 0 12px; padding: 8px 12px; background: #fff; border: 1px solid var(--color-line); border-radius: 8px; }
+.terms-version { margin: 12px 0 0; font-size: 13px; color: var(--color-sub); }
+.terms-lead > .terms-text:first-child { font-weight: bold; }
+/* 「同意する」は全文の下に置く（読み終えたところで押す。上に固定しない） */
+.agree-actions { margin-top: 16px; padding-top: 12px; border-top: 1px solid var(--color-line); }
+.link-terms { display: inline-block; margin-top: 12px; font-size: 14px; color: var(--color-accent); }
+/* 鑑定結果：計算結果（表の見た目のカード）と鑑定書（紙の見た目）を分ける（2026-10-21）。鑑定書だけ送ることもあるため */
+.zone-title { font-size: 18px; margin: 4px 0 8px; color: var(--color-brand, var(--color-text)); }
+.zone-report { margin: 20px 0 12px; padding: 20px 18px 24px; background: var(--color-paper); border: 1px solid var(--color-paper-line); border-top: 4px solid var(--color-brand, var(--color-accent)); box-shadow: 0 2px 10px rgba(31, 35, 40, 0.10); }
+.report-title { margin: 4px 0 2px; text-align: center; font-family: var(--font-report); font-size: 26px; letter-spacing: 0.3em; color: var(--color-brand, var(--color-text)); }
+.report-count { margin: 0 0 8px; text-align: left; font-size: 13px; color: var(--color-sub); font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; }
+/* 鑑定書の最後の字数（印刷・納品物にも載せる。送る分だけ） */
+.report-count-end { margin: 24px 0 0; padding-top: 8px; border-top: 1px solid var(--color-paper-line); text-align: right; font-family: var(--font-report); font-size: 14px; color: var(--color-sub); font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; }
+.report-count-end:empty { display: none; }
+.zone-report .report-chapter > .result-block-title { font-family: var(--font-report); font-size: 18px; border-left: 0; padding: 0 0 4px; border-bottom: 1px solid var(--color-paper-line); }
+.zone-report .report-text, .zone-report .edit-current p { font-family: var(--font-report); font-size: 16px; line-height: 1.9; }
+.zone-report .report-subheading { font-family: var(--font-report); font-size: 15px; }
+.zone-report .result-table th, .zone-report .result-table td { border-color: var(--color-paper-line); }
+/* 鑑定結果：まとまり（命式詳細〜日運表を縦に並べる）・表。表は横にはみ出す分だけ枠の中で横に動かす（ページ全体は横に動かさない） */
+.result-group-title { font-size: 18px; margin: 28px 0 4px; padding: 0 0 4px; color: var(--color-brand, var(--color-text)); border-bottom: 2px solid var(--color-brand, var(--color-accent)); }
+.result-hint { margin-top: 4px; }
+.result-block { margin: 12px 0 0; }
+.result-block-title { font-size: 15px; margin: 0 0 4px; padding-left: 6px; border-left: 3px solid var(--color-accent); }
+.result-text { margin: 2px 0; font-size: 14px; white-space: pre-wrap; }
+.table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; margin: 4px 0; }
+.result-table { border-collapse: collapse; background: #fff; font-size: 14px; min-width: 100%; }
+.result-table th, .result-table td { border: 1px solid var(--color-line); padding: 4px 6px; text-align: center; white-space: nowrap; }
+.result-table thead th { background: var(--color-card); font-weight: bold; }
+html[data-brand-color] .result-table thead th { background: var(--color-brand); color: #fff; border-color: var(--color-brand); }
+.result-table tbody th { background: var(--color-card); font-weight: normal; text-align: left; }
+.result-table.is-info td { text-align: left; }
+.result-table.is-wide { font-size: 13px; }
+.result-table.is-wide tbody th { text-align: center; }
+.result-table.is-fortune td:last-child { white-space: normal; min-width: 12em; text-align: left; }
+.result-table.is-report td { white-space: pre-wrap; text-align: left; }
+.result-table.is-report td:last-child { min-width: 12em; }
+.report-chapter { margin-top: 20px; }
+.report-heading { font-size: 14px; margin: 10px 0 4px; color: var(--color-sub); }
+.report-subheading { font-size: 14px; margin: 8px 0 2px; }
+.report-text { line-height: 1.7; }
+/* 折れ線グラフ（縦軸 0〜100）。点が多いときは枠の中で横に動かす */
+.chart { margin: 4px 0 8px; }
+.chart-title { font-size: 14px; margin: 0 0 2px; }
+.chart-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; background: #fff; border: 1px solid var(--color-line); border-radius: 6px; }
+.chart-wrap svg { display: block; }
+.chart-grid { stroke: var(--color-line); stroke-width: 1; }
+.chart-axis { fill: var(--color-sub); font-size: 11px; }
+.chart-line { fill: none; stroke-width: 2; }
+/* 項目の開閉（段階3a-2）。閉じた項目は見出しとボタンだけを出す（送る・印刷に載せない） */
+.section-toggle { font-size: 13px; padding: 3px 10px; margin: 0 0 4px; border: 1px solid var(--color-line); border-radius: 6px; background: #fff; color: var(--color-accent); }
+/* 閉じた項目は色の枠で示す（中身は隠す。2026-10-21） */
+.result-block.is-closed { padding: 6px 10px; background: var(--color-closed-bg); border: 1px dashed var(--color-closed-line); border-radius: 6px; }
+.result-block.is-closed > *:not(.result-block-title):not(.section-toggle) { display: none; }
+.result-block.is-closed > .result-block-title { color: var(--color-sub); }
+.result-block.is-closed > .result-block-title::after { content: "（送らない）"; font-size: 13px; font-weight: normal; }
+.result-block.is-closed > .section-toggle { background: #fff; color: var(--color-text); }
+/* 鑑定文の書き直し（段階3b）。書いている間は、いまの文の代わりに入力欄を出す（原文は「原文を見る」で並べて見る） */
+.edit-block { margin: 0 0 6px; }
+.edit-block.is-edited > .edit-current { border-left: 3px solid var(--color-ok); padding-left: 6px; }
+.edit-block.is-editing > .edit-current { display: none; }
+.edit-note { margin: 0; font-size: 12px; color: var(--color-ok); }
+.edit-note[hidden] { display: none; }
+.edit-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 2px 0 4px; }
+.edit-count { margin-left: auto; font-size: 12px; color: var(--color-sub); font-variant-numeric: tabular-nums; }
+.btn-edit { font-size: 13px; padding: 3px 10px; border: 1px solid var(--color-line); border-radius: 6px; background: #fff; color: var(--color-accent); }
+.btn-edit[hidden] { display: none; }
+.edit-original { margin: 0 0 4px; padding: 4px 8px; background: var(--color-card); border-radius: 6px; }
+.edit-original[hidden] { display: none; }
+.edit-original-label { margin: 0; font-size: 12px; color: var(--color-sub); }
+.edit-input { display: block; box-sizing: border-box; width: 100%; font-size: 16px; line-height: 1.6; resize: vertical; }
+.edit-input[hidden] { display: none; }
+/* 屋号・ロゴ・色（段階3a-4）。色は --color-brand（設定がなければ今までの色） */
+.brand-bar { display: flex; align-items: center; gap: 12px; margin: 0 0 8px; padding: 0 0 8px; border-bottom: 2px solid var(--color-brand, var(--color-line)); }
+.brand-bar[hidden] { display: none; }
+.brand-bar-logo { display: block; max-height: 48px; max-width: 40%; }
+.brand-bar-logo[hidden] { display: none; }
+.brand-bar-name { font-weight: bold; color: var(--color-brand, var(--color-text)); word-break: break-word; }
+.brand-logo-preview { display: block; max-height: 64px; max-width: 100%; margin: 0 0 8px; background: #fff; border: 1px solid var(--color-line); }
+.brand-logo-preview[hidden] { display: none; }
+#secResult .result-block-title { border-left-color: var(--color-brand, var(--color-accent)); }
+/* 送る・印刷の欄。送る項目の一覧（まとまりごとにチェック） */
+.send-groups { display: grid; gap: 8px; margin: 8px 0; }
+.send-steps { padding-left: 1.6em; }   /* 「送る・印刷」の頭の3つの流れ */
+.send-group { padding: 8px 10px; background: #fff; border: 1px solid var(--color-line); border-radius: 6px; }
+.send-group-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 6px; }
+.send-group-title { flex: 1; font-weight: bold; }
+.send-group-count { order: 3; flex-basis: 100%; font-size: 13px; color: var(--color-sub); }
+.send-items { display: flex; flex-wrap: wrap; gap: 4px 12px; }
+.send-item { display: inline-flex; align-items: center; gap: 4px; font-size: 14px; }
+.send-item input { width: 18px; height: 18px; margin: 0; }
+.field textarea { resize: vertical; line-height: 1.5; }
+.download-links, .record-parts { padding-left: 0; margin: 6px 0; list-style: none; }
+.download-links li, .record-parts li { margin: 4px 0; }
+.download-links a { display: inline-block; text-decoration: none; word-break: break-all; }
+.record-part { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 14px; }
+.record-part .btn { margin: 0; }
+.record-part-status { color: var(--color-ok); }
+.record-part-body { flex-basis: 100%; }
+.record-part-body summary { cursor: pointer; font-size: 13px; color: var(--color-accent); }
+.record-part-text { max-height: 240px; overflow: auto; margin: 4px 0; padding: 8px; background: #fff; border: 1px solid var(--color-line); border-radius: 6px; font-size: 12px; white-space: pre-wrap; word-break: break-word; font-family: inherit; }
+/* メニューの説明 */
+.menu-item-detail { display: block; font-size: 13px; line-height: 1.6; color: var(--color-text); margin-top: 6px; }
+/* デザインの見本（いまの設定を同じ画面で見る） */
+.brand-sample { margin: 8px 0 12px; }
+.brand-sample-label { margin: 0 0 4px; font-size: 13px; color: var(--color-sub); }
+.brand-sample-paper { padding: 12px 14px; background: var(--color-paper); border: 1px solid var(--color-paper-line); border-top: 4px solid var(--color-brand, var(--color-accent)); box-shadow: 0 2px 8px rgba(31, 35, 40, 0.08); }
+.brand-sample-head { display: flex; align-items: center; gap: 8px; padding: 0 0 6px; border-bottom: 2px solid var(--color-brand, var(--color-line)); }
+.brand-sample-logo { display: block; max-height: 36px; max-width: 35%; }
+.brand-sample-name { font-weight: bold; color: var(--color-brand, var(--color-text)); min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.brand-sample-right { margin-left: auto; font-size: 11px; color: var(--color-sub); white-space: nowrap; }
+.brand-sample-title { margin: 10px 0 6px; font-family: var(--font-report); font-weight: bold; font-size: 16px; color: var(--color-brand, var(--color-text)); }
+.brand-sample-table { font-size: 13px; }
+
+/* 印刷（docs/web-pdf-plan.md §4.7）：鑑定結果の開いている項目だけを、表のまま出す。運勢表は横向きのページ（2026-10-21）。
+   改ページはブラウザに任せる（横向きのページ page: fortune に対応しないブラウザは縦のまま） */
+@page fortune { size: A4 landscape; margin: 12mm; }
+@media print {
+  body { font-size: 12pt; }
+  .page { max-width: none; padding: 0; }
+  .app-bar, .screen-title, .toc, .result-hint, .report-count, #secInput, #secSend, .section-toggle, .result-block.is-closed { display: none !important; }
+  .screen:not(#scrKantei) { display: none !important; }
+  .zone-calc, .zone-report { border: 0; box-shadow: none; background: none; padding: 0; margin: 0; }
+  .zone-report { break-before: page; }
+  .zone-report.is-all-closed { display: none; }
+  .fortune-group { page: fortune; break-before: page; }
+  .result-group-title { margin-top: 16px; break-after: avoid; }
+  .result-group-title.is-all-closed { display: none; }
+  .fortune-group:has(.result-group-title.is-all-closed) { display: none; }
+  .result-table { font-size: 11pt; width: 100%; }
+  .result-table th, .result-table td { white-space: normal; padding: 3px 5px; }
+  .result-table thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .edit-note, .edit-controls, .edit-original, .edit-input { display: none !important; }   /* 書き直した後の文だけを出す */
+  .edit-block.is-editing > .edit-current { display: block; }
+  .edit-block.is-edited > .edit-current { border-left: 0; padding-left: 0; }
+  .zone-title { margin-top: 0; }
+  .table-wrap { overflow: visible; }
+  .result-table tr, .chart, .result-block-title { break-inside: avoid; }
+  .result-block-title { break-after: avoid; }
+  .brand-bar { break-after: avoid; }
+  .chart-wrap { overflow: visible; border: 0; }
+  .chart-wrap svg { max-width: 100%; height: auto; }
+}
