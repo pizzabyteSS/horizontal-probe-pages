@@ -127,6 +127,8 @@ html[data-brand-color] .app-bar-title, html[data-brand-color] .app-bar-back, htm
 .result-table th, .result-table td { border: 1px solid var(--color-line); padding: 4px 6px; text-align: center; white-space: nowrap; }
 .result-table thead th { background: var(--color-card); font-weight: bold; }
 html[data-brand-color] .result-table thead th { background: var(--color-brand); color: #fff; border-color: var(--color-brand); }
+/* 鑑定書の章の見出しも決めた色にする（PDF と同じ。画面・印刷とも） */
+html[data-brand-color] #outReport .result-block:not(.is-closed) > .result-block-title { color: var(--color-brand); }   /* 閉じた章は閉じた色のまま（Codex P2） */
 .result-table tbody th { background: var(--color-card); font-weight: normal; text-align: left; }
 .result-table.is-info td { text-align: left; }
 .result-table.is-wide { font-size: 13px; }

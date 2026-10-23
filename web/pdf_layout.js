@@ -67,6 +67,7 @@
   var TABLE_LINE_COLOR = '#d1d9e0';
   var TABLE_HEAD_FILL = '#eef1f4';
   var TABLE_ROW_HEAD_FILL = '#f6f8fa';
+  var TABLE_HEAD_BRAND_TEXT = '#ffffff';   // 色を決めたときの表の見出しの字（色は brand.js の候補。どれも白地で読める＝白字も読める）
   var CHART_HEIGHT = 460;     // 題名を含むグラフ1つの高さ
   var CHART_AFTER = 16;
   var MIN_LINES_AFTER_HEADING = 2;
@@ -375,11 +376,11 @@
     var x = CONTENT_LEFT;
     widths.forEach(function (w, c) {
       var fill = isHead ? TABLE_HEAD_FILL : (c === 0 ? TABLE_ROW_HEAD_FILL : null);
-      cursor.add({ kind: 'cell', x: x, y: cursor.y, w: w, h: height, fill: fill, stroke: TABLE_LINE_COLOR, tag: tag });
+      cursor.add({ kind: 'cell', x: x, y: cursor.y, w: w, h: height, fill: fill, stroke: TABLE_LINE_COLOR, tag: tag, isTableHead: isHead });
       var style = isHead || c === 0 ? STYLE.tableHead : STYLE.table;
       shape.cells[c].slice(fromLine, toLine).forEach(function (line, i) {
         cursor.add({ kind: 'text', x: x + CELL_PADDING, y: cursor.y + CELL_PADDING + i * lineHeight, lineHeight: lineHeight,
-          text: line, font: formatFont(style), color: style.color, width: measure(line, formatFont(style)), maxWidth: w - CELL_PADDING * 2, tag: tag });
+          text: line, font: formatFont(style), color: style.color, width: measure(line, formatFont(style)), maxWidth: w - CELL_PADDING * 2, tag: tag, isTableHead: isHead });
       });
       x += w;
     });
@@ -479,6 +480,11 @@
     if (!color) return;
     pages.forEach(function (page) {
       page.items.forEach(function (item) {
+        // 表の見出しの行も色で塗り、字を白にする（画面・印刷と同じ。灰色のままだとデザインが変わった感じがしなかった。2026-10-23 ガクさん）
+        if (item.isTableHead) {
+          if (item.kind === 'cell') { item.fill = color; item.stroke = color; } else if (item.kind === 'text') item.color = TABLE_HEAD_BRAND_TEXT;
+          return;
+        }
         if (!item.tag || item.tag.role !== 'heading') return;
         var block = blocks[item.tag.block];
         if (block.type === 'title' || (block.level || 1) === 1) item.color = color;
