@@ -14,6 +14,8 @@
   var VIEW = window.HZ_WEB_VIEW = window.HZ_WEB_VIEW || {};
 
   var DOCUMENT_TITLE = '鑑定書';
+  var CALC_TITLE = '命式・運勢表';   // 計算結果と鑑定書の両方を載せるときの、1ページ目の題名
+  var REPORT_SECTION_PREFIX = 'report.';   // 鑑定書の章（view_report.js の項目のキー）
   var FILE_PREFIX = '鑑定書';
   var UNSAFE_FILE_CHARS = /[\\/:*?"<>|\u0000-\u001F]/g;   // ファイル名に使えない字
   var LANDSCAPE_SECTION_PREFIX = 'fortune.';   // 横向きのページに置く項目（運勢表。view_fortune.js の項目のキー）
@@ -49,9 +51,21 @@
    */
   function buildReportDocument(model, options) {
     var opts = options || {};
-    var blocks = [{ type: 'title', text: DOCUMENT_TITLE }].concat(buildSectionBlocks(VIEW.buildInfoSection(model.info)));
+    var sections = VIEW.listOpenSections(model, opts.closedKeys || {});
+    var isReport = function (section) { return String(section.key).indexOf(REPORT_SECTION_PREFIX) === 0; };
+    // 計算結果と鑑定書の両方を載せるときは、鑑定書を新しいページの題名「鑑定書」から始める
+    //   （計算結果の後にいきなり第1章が来て、鑑定書の始まりが分からなかった。2026-10-23 ガクさん）
+    var hasBoth = sections.some(isReport) && sections.some(function (section) { return !isReport(section); });
+    var blocks = [{ type: 'title', text: hasBoth ? CALC_TITLE : DOCUMENT_TITLE }].concat(buildSectionBlocks(VIEW.buildInfoSection(model.info)));
     var orientation = 'portrait';
-    VIEW.listOpenSections(model, opts.closedKeys || {}).forEach(function (section) {
+    var reportStarted = false;
+    sections.forEach(function (section) {
+      if (hasBoth && !reportStarted && isReport(section)) {
+        reportStarted = true;
+        blocks.push({ type: 'page', orientation: 'portrait', breakBefore: true });
+        blocks.push({ type: 'title', text: DOCUMENT_TITLE });
+        orientation = 'portrait';
+      }
       // 運勢表は横向きのページ。向きが変わるところで部品 page を入れる（その項目は新しいページから始まる）
       var wanted = isLandscapeSection(section) ? 'landscape' : 'portrait';
       if (wanted !== orientation) { blocks.push({ type: 'page', orientation: wanted }); orientation = wanted; }

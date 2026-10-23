@@ -241,9 +241,13 @@
       cursor.y = bodyTop;
     };
     /** 以降のページの向きを変える。いまのページが空ならそのページを替え、そうでなければ次のページから。 */
-    cursor.setOrientation = function (orientation) {
+    /** 以降のページの向きを変える。breakBefore なら向きが同じでも新しいページから始める（ページが空なら何もしない）。 */
+    cursor.setOrientation = function (orientation, breakBefore) {
       var geo = GEOMETRY[orientation] || GEOMETRY.portrait;
-      if (geo === cursor.geo) return;
+      if (geo === cursor.geo) {
+        if (breakBefore && cursor.page.items.length) cursor.newPage();
+        return;
+      }
       cursor.geo = geo;
       cursor.bodyHeight = geo.bodyBottom - bodyTop;
       if (!cursor.page.items.length) cursor.pages.pop();
@@ -486,7 +490,7 @@
    * 中身をページに割る。doc は { header: { name, kanteiDate, brandName, brandColor, brandLogo: { width, height } または null }, blocks: [部品] }。
    * 部品：{ type: 'title'|'heading', level, text } / { type: 'paragraph', text } / { type: 'note', text }（末尾の注記。右寄せ・小さめ・区切り線） /
    *       { type: 'table', headers: [..] または null, rows: [[..]] } / { type: 'chart', title, points: [{ label, value }], color } /
-   *       { type: 'page', orientation: 'portrait'|'landscape' }（以降のページの向き）
+   *       { type: 'page', orientation: 'portrait'|'landscape', breakBefore }（以降のページの向き。breakBefore なら新しいページから）
    * 返す値：[{ items: [描く項目], orientation, width, height, widthPt, heightPt }]。項目の座標はページの左上が 0。
    *   ロゴは { kind: 'image' }（描くときに画像を渡す）
    */
@@ -502,7 +506,7 @@
       return widthsByBlock[key];
     };
     doc.blocks.forEach(function (block, index) {
-      if (block.type === 'page') cursor.setOrientation(block.orientation);
+      if (block.type === 'page') cursor.setOrientation(block.orientation, !!block.breakBefore);
       else if (block.type === 'title' || block.type === 'heading') placeHeading(cursor, doc.blocks, index, measure, charWidth, widthsCache);
       else if (block.type === 'paragraph') placeParagraph(cursor, doc.blocks, index, measure, charWidth);
       else if (block.type === 'note') placeNote(cursor, doc.blocks, index, measure, charWidth);

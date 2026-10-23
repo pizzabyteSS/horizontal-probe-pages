@@ -108,6 +108,7 @@
   var pendingFresh = null;  // 原文が変わっていたときに作り直した結果（{ table, input, name }）。古い1件を消したら新しい鑑定として出す
   var needsRelogin = false; // 「ログインし直す」を押した（画面に鑑定が出ていてもログインを出す）
   var shownScreen = '';     // いま出している画面（SCREENS のキー）
+  var isConfirming = false; // 確かめる窓を開いている（その間は同じ操作を受け付けない）
 
   // ---- 小道具 ----
   function byId(id) { return document.getElementById(id); }
@@ -532,18 +533,24 @@
   }
 
   /**
-   * 新しく鑑定する前に、端末の作業中の鑑定が置き換わってよいか確かめる。
-   * 返す値：やめたら null（サーバーへは送らない）。よければ、確かめる前に読んだ1件の版（なければ ''）。
+   * 新しく鑑定する前に、端末の作業中の鑑定が置き換わってよいか確かめる（ページの中の窓。VIEW.askConfirm）。
+   * 返す値：Promise。やめたら null（サーバーへは送らない）。よければ、確かめる前に読んだ1件の版（なければ ''）。
    *   この版を鑑定の基準にする（確認を開いている間に別のタブが書いた、見ていない作業は置き換えない。Codex P1）
    */
   function confirmReplaceWork() {
     var draft = VIEW.readWorkDraft();
     var rev = draft ? draft.rev : '';
-    if (!draft && !currentWork) return rev;
+    if (!draft && !currentWork) return Promise.resolve(rev);
     var message = draft && draft.ownerId !== session.loginId
       ? 'この端末には、別の ID の作業中の鑑定が1件残っています。新しく鑑定すると、それは消えて置き換わります。よろしいですか'
       : '作業中の鑑定を端末から消して、新しく鑑定します（消す前に自分用の記録を残しておくと控えが残ります）。よろしいですか';
-    return window.confirm(message) ? rev : null;
+    // 確かめている間の基準は、確かめる前の状態（画面の鑑定と版）で控える
+    var base = captureReplaceBase(rev);
+    isConfirming = true;
+    return VIEW.askConfirm(message, { okLabel: '新しく鑑定する' }).then(function (isOk) {
+      isConfirming = false;
+      return isOk ? base : null;
+    });
   }
 
   /**
@@ -616,15 +623,22 @@
    * messageId は結果を知らせる欄（押したボタンのある画面の欄）
    */
   function requestClearWork(messageId) {
-    if (isBusy) return;
-    if (!window.confirm('作業中の鑑定をこの端末から消しますか。画面の結果・メモ・控えも消えます')) return;
-    // 確かめた時点の対象を控える（排他を待つ間に画面が変わっても、確かめたものだけを消す。Codex P2）。
+    if (isBusy || isConfirming) return;
+    // 確かめる前の対象を控える（窓を開いている間・排他を待つ間に、別のタブが書いた見ていない作業は消さない。Codex P1・P2）。
     // 画面の鑑定の版は排他の中で読む（先に並んでいた保存で版が進んでいることがあるため）
     var own = currentWork || draftProblem ? null : readOwnDraft();
     var target = {
       work: currentWork, fresh: pendingFresh, messageId: messageId,
       rev: draftProblem ? draftProblem.draft.rev : (own ? own.rev : null)
     };
+    isConfirming = true;
+    VIEW.askConfirm('作業中の鑑定をこの端末から消しますか。画面の結果・メモ・控えも消えます', { okLabel: '消す' }).then(function (isOk) {
+      isConfirming = false;
+      if (isOk && !isBusy) clearWorkConfirmed(target);
+    });
+  }
+
+  function clearWorkConfirmed(target) {
     // 消し終わるまで、ほかの操作（新しい鑑定など）をさせない
     setBusy(true);
     // 照らし合わせと消すを、ほかのタブと割り込まれずに一続きで行う
@@ -687,16 +701,19 @@
    * 上（画面だけ）は送る分と、閉じた章があれば全体も。鑑定書の最後（印刷・納品物）は送る分だけ
    */
   function renderReportCount() {
-    var text = '';
+    var element = byId('outReportCount');
     var endText = '';
+    element.textContent = '';
     if (currentWork) {
+      // 合計を大きく、内訳と数え方は小さく分ける（1行に詰めると読みにくかった。2026-10-23 ガクさん）
       var count = VIEW.countReportChars(currentWork.model, textEdits, closedKeys);
-      text = '字数（相手に送る分）：' + VIEW.formatReportCharCount(count.open);
-      if (count.all.total !== count.open.total) text += ' ／ 鑑定書全体：合計 ' + count.all.total + '字';
-      text += ' （項目名・見出し・空白・改行は数えない）';
+      element.appendChild(VIEW.createElement('span', 'report-count-total', '相手に送る分 ' + count.open.total + '字'));
+      element.appendChild(VIEW.createElement('span', 'report-count-detail',
+        '項目 ' + count.open.items + '字 ＋ 鑑定文 ' + count.open.body + '字' +
+        (count.all.total !== count.open.total ? '（鑑定書全体は ' + count.all.total + '字）' : '')));
+      element.appendChild(VIEW.createElement('span', 'report-count-rule', '項目名・見出し・空白・改行は数えません'));
       endText = '本鑑定書の文字数： ' + VIEW.formatReportCharCount(count.open);
     }
-    byId('outReportCount').textContent = text;
     byId('outReportCountEnd').textContent = endText;
   }
 
@@ -871,11 +888,15 @@
   }
 
   function handleKanteiOnceClick() {
-    if (isBusy || !hasSession()) return;
-    var rev = confirmReplaceWork();
-    if (rev === null) return;
-    var base = captureReplaceBase(rev);
+    if (isBusy || isConfirming || !hasSession()) return;
     var request = { name: readNameInput(), input: readInputForm() };   // 押した時点の氏名と入力
+    confirmReplaceWork().then(function (base) {
+      if (base === null || isBusy || !hasSession()) return;
+      startKanteiOnce(base, request);
+    });
+  }
+
+  function startKanteiOnce(base, request) {
     setBusy(true);
     // 待っている自分の保存が終わってから、基準の版を読む（Codex P2）
     lastSavePromise.then(function () {
@@ -887,10 +908,14 @@
   }
 
   function handleKanteiStreakClick() {
-    if (isBusy || !hasSession()) return;
-    var rev = confirmReplaceWork();
-    if (rev === null) return;
-    var base = captureReplaceBase(rev);
+    if (isBusy || isConfirming || !hasSession()) return;
+    confirmReplaceWork().then(function (base) {
+      if (base === null || isBusy || !hasSession()) return;
+      startKanteiStreak(base);
+    });
+  }
+
+  function startKanteiStreak(base) {
     setBusy(true);
     var times = [];
     var chain = Promise.resolve(true);

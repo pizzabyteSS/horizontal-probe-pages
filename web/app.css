@@ -74,6 +74,14 @@ html[data-brand-color] .app-bar-title, html[data-brand-color] .app-bar-back, htm
 /* マニュアル */
 .manual h3 { font-size: 15px; margin: 14px 0 4px; color: var(--color-brand, var(--color-text)); }
 .manual p { margin: 4px 0; font-size: 14px; line-height: 1.7; }
+/* 確かめる窓（view_common.js の askConfirm。window.confirm の代わり） */
+.confirm-overlay { position: fixed; inset: 0; z-index: 100; display: flex; align-items: center; justify-content: center; padding: 16px; background: rgba(31, 35, 40, 0.45); }
+.confirm-box { width: 100%; max-width: 420px; padding: 16px; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(31, 35, 40, 0.25); }
+.confirm-message { margin: 0 0 14px; font-size: 15px; line-height: 1.7; }
+.confirm-buttons { display: flex; justify-content: flex-end; gap: 8px; flex-wrap: wrap; }
+.confirm-buttons .btn { margin: 0; }
+.edit-empty { margin: 4px 0; color: var(--color-ng); font-size: 14px; }
+.edit-flash { margin-left: 8px; font-size: 13px; color: var(--color-ok); font-weight: bold; }
 /* 利用規約・プライバシーポリシー（同意の画面と、いつでも読める画面。terms.js が書く） */
 .terms + .terms { margin-top: 20px; padding-top: 12px; border-top: 1px solid var(--color-line); }
 .terms-title { font-size: 17px; margin: 4px 0 8px; color: var(--color-brand, var(--color-text)); }
@@ -91,7 +99,16 @@ html[data-brand-color] .app-bar-title, html[data-brand-color] .app-bar-back, htm
 .zone-title { font-size: 18px; margin: 4px 0 8px; color: var(--color-brand, var(--color-text)); }
 .zone-report { margin: 20px 0 12px; padding: 20px 18px 24px; background: var(--color-paper); border: 1px solid var(--color-paper-line); border-top: 4px solid var(--color-brand, var(--color-accent)); box-shadow: 0 2px 10px rgba(31, 35, 40, 0.10); }
 .report-title { margin: 4px 0 2px; text-align: center; font-family: var(--font-report); font-size: 26px; letter-spacing: 0.3em; color: var(--color-brand, var(--color-text)); }
-.report-count { margin: 0 0 8px; text-align: left; font-size: 13px; color: var(--color-sub); font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; }
+.report-count { margin: 0 0 12px; text-align: left; font-variant-numeric: tabular-nums; }
+.report-count:empty { display: none; }
+.report-count-total { display: block; font-size: 17px; font-weight: bold; color: var(--color-text); }
+.report-count-detail { display: block; font-size: 14px; color: var(--color-text); }
+.report-count-rule { display: block; font-size: 12px; color: var(--color-sub); }
+/* 鑑定書の使い方（画面だけ）。補足ではなく使い方として目立たせる */
+.report-guide { margin: 8px 0 12px; padding: 12px 14px; background: #fff8e6; border: 1px solid var(--color-closed-line); border-left: 6px solid var(--color-closed-line); border-radius: 8px; font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; }
+.report-guide-title { margin: 0 0 6px; font-size: 15px; font-weight: bold; line-height: 1.6; }
+.report-guide-text { margin: 0 0 6px; font-size: 14px; line-height: 1.7; }
+.report-guide-steps { margin: 0; padding-left: 1.3em; font-size: 14px; line-height: 1.8; }
 /* 鑑定書の最後の字数（印刷・納品物にも載せる。送る分だけ） */
 .report-count-end { margin: 24px 0 0; padding-top: 8px; border-top: 1px solid var(--color-paper-line); text-align: right; font-family: var(--font-report); font-size: 14px; color: var(--color-sub); font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; }
 .report-count-end:empty { display: none; }
@@ -200,7 +217,7 @@ html[data-brand-color] .result-table thead th { background: var(--color-brand); 
 @media print {
   body { font-size: 12pt; }
   .page { max-width: none; padding: 0; }
-  .app-bar, .screen-title, .toc, .result-hint, .report-count, #secInput, #secSend, .section-toggle, .result-block.is-closed { display: none !important; }
+  .app-bar, .screen-title, .toc, .result-hint, .report-guide, .report-count, .confirm-overlay, #secInput, #secSend, .section-toggle, .result-block.is-closed { display: none !important; }
   .screen:not(#scrKantei) { display: none !important; }
   .zone-calc, .zone-report { border: 0; box-shadow: none; background: none; padding: 0; margin: 0; }
   .zone-report { break-before: page; }
@@ -212,7 +229,7 @@ html[data-brand-color] .result-table thead th { background: var(--color-brand); 
   .result-table { font-size: 11pt; width: 100%; }
   .result-table th, .result-table td { white-space: normal; padding: 3px 5px; }
   .result-table thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-  .edit-note, .edit-controls, .edit-original, .edit-input { display: none !important; }   /* 書き直した後の文だけを出す */
+  .edit-note, .edit-controls, .edit-original, .edit-input, .edit-empty { display: none !important; }    /* 書き直した後の文だけを出す（空にした文の知らせも出さない） */
   .edit-block.is-editing > .edit-current { display: block; }
   .edit-block.is-edited > .edit-current { border-left: 0; padding-left: 0; }
   .zone-title { margin-top: 0; }

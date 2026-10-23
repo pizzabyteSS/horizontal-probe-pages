@@ -200,6 +200,71 @@
     }
   }
 
+  // ---- 確かめる画面（ページの中の小さな窓） ----
+  // window.confirm は使わない：アプリの中のブラウザ（Claude のブラウザなど）では窓が出ずに「いいえ」になり、
+  //   鑑定し直す・作業中の鑑定を消す・原文に戻すが黙って効かなかった（2026-10-23 ガクさんの実機確認）
+  var openConfirm = null;   // 開いている窓（同時に1つだけ）
+
+  /**
+   * message を出して確かめる。options：{ okLabel（既定「はい」）, cancelLabel（既定「やめる」） }。
+   * 返す値：Promise<true（はい）/ false（やめる・Esc）>。開いている間は、後ろの画面を押せない
+   */
+  function askConfirm(message, options) {
+    var opts = options || {};
+    if (openConfirm) openConfirm.close(false);   // 前の窓は「やめる」として閉じる
+    return new Promise(function (resolve) {
+      var overlay = createElement('div', 'confirm-overlay');
+      var box = createElement('div', 'confirm-box');
+      box.setAttribute('role', 'alertdialog');
+      box.setAttribute('aria-modal', 'true');
+      var text = createElement('p', 'confirm-message', message);
+      text.id = 'outConfirmMessage';
+      box.setAttribute('aria-describedby', text.id);
+      box.appendChild(text);
+      var buttons = createElement('div', 'confirm-buttons');
+      var cancel = createElement('button', 'btn btn-sub confirm-cancel', opts.cancelLabel || 'やめる');
+      var ok = createElement('button', 'btn confirm-ok', opts.okLabel || 'はい');
+      cancel.type = 'button';
+      ok.type = 'button';
+      buttons.appendChild(cancel);
+      buttons.appendChild(ok);
+      box.appendChild(buttons);
+      overlay.appendChild(box);
+      var previousFocus = document.activeElement;
+      var state = {
+        close: function (answer) {
+          if (openConfirm !== state) return;
+          openConfirm = null;
+          document.removeEventListener('keydown', handleKey, true);
+          document.removeEventListener('focusin', handleFocusIn, true);
+          if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
+          // 窓を開く前の場所へ戻す（キーボードで続けて操作できるように）
+          if (previousFocus && previousFocus.isConnected && typeof previousFocus.focus === 'function') previousFocus.focus();
+          resolve(answer);
+        }
+      };
+      // 開いている間は、キーボードの移動を窓の2つのボタンの中に留める（後ろの画面を操作させない。Codex P2）
+      function handleKey(event) {
+        if (event.key === 'Escape') { event.preventDefault(); state.close(false); return; }
+        if (event.key === 'Tab') {
+          event.preventDefault();
+          (document.activeElement === ok ? cancel : ok).focus();
+        }
+      }
+      function handleFocusIn(event) {
+        if (!box.contains(event.target)) ok.focus();
+      }
+      ok.addEventListener('click', function () { state.close(true); });
+      cancel.addEventListener('click', function () { state.close(false); });
+      document.addEventListener('keydown', handleKey, true);
+      document.addEventListener('focusin', handleFocusIn, true);
+      openConfirm = state;
+      document.body.appendChild(overlay);
+      if (typeof ok.focus === 'function') ok.focus();
+    });
+  }
+
+  VIEW.askConfirm = askConfirm;
   VIEW.createElement = createElement;
   VIEW.appendSection = appendSection;
   VIEW.appendTable = appendTable;

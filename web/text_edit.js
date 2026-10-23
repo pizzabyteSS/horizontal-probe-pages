@@ -21,6 +21,8 @@
     revert: '原文に戻す'
   };
   var EDITED_NOTE = '（書き直しています）';
+  var EMPTY_NOTE = '（文が空です。このままだと、この文は送る・印刷に載りません）';
+  var REVERTED_NOTE = '原文に戻しました';
   var REVERT_CONFIRM = 'この文を原文に戻しますか（書き直した文は消えます）';
 
   function hasOwn(object, key) { return Object.prototype.hasOwnProperty.call(object, key); }
@@ -223,13 +225,28 @@
     var current = findChild(block, 'edit-current');
     var text = isEdited ? edits[key].text : originals[key].text;
     current.textContent = '';
-    VIEW.appendLines(current, text, block.getAttribute('data-line-class'));
+    // 消して空にしたときは、空であることをはっきり出す（原文が出ているように見えて紛らわしかった。2026-10-23）
+    if (isEdited && !countBodyChars(text)) current.appendChild(VIEW.createElement('p', 'edit-empty', EMPTY_NOTE));
+    else VIEW.appendLines(current, text, block.getAttribute('data-line-class'));
     findChild(block, 'edit-count').textContent = formatCharCount(text);
     block.className = 'edit-block' + (isEdited ? ' is-edited' : '') + (/\bis-editing\b/.test(block.className) ? ' is-editing' : '');
     findChild(block, 'edit-note').hidden = !isEdited;
     findChild(block, 'edit-show-original').hidden = !isEdited;
     findChild(block, 'edit-revert').hidden = !isEdited;
     if (!isEdited) showOriginal(block, false);
+  }
+
+  /** 文の下に、操作の結果を少しの間だけ出す（原文に戻したことが分かるように）。 */
+  function flashNote(block, text) {
+    var flash = findChild(block, 'edit-flash');
+    if (!flash) {
+      flash = VIEW.createElement('span', 'edit-flash');
+      flash.setAttribute('role', 'status');
+      findChild(block, 'edit-controls').appendChild(flash);
+    }
+    flash.textContent = text;
+    var shown = text;
+    window.setTimeout(function () { if (flash.textContent === shown) flash.textContent = ''; }, 4000);
   }
 
   /** root の中の書き直せる文すべてに、書き直しを当てる（鑑定を書いたあと・続きからのあとに呼ぶ）。 */
@@ -273,11 +290,15 @@
       } else if (/\bedit-show-original\b/.test(button.className)) {
         showOriginal(block, findChild(block, 'edit-original').hidden);
       } else if (/\bedit-revert\b/.test(button.className)) {
-        if (!window.confirm(REVERT_CONFIRM)) return;
-        if (!writeTextEdit(edits, originals, key, originals[key].text)) return;
-        if (!findChild(block, 'edit-input').hidden) findChild(block, 'edit-input').value = originals[key].text;
-        renderEditBlock(block, edits, originals);
-        deps.onChanged();
+        VIEW.askConfirm(REVERT_CONFIRM, { okLabel: '原文に戻す' }).then(function (isOk) {
+          // 確かめている間に別の鑑定に替わっていたら何もしない（その画面の書き直し・原文で確かめ直す）
+          if (!isOk || deps.getEdits() !== edits || !block.isConnected) return;
+          if (!writeTextEdit(edits, originals, key, originals[key].text)) return;
+          if (!findChild(block, 'edit-input').hidden) findChild(block, 'edit-input').value = originals[key].text;
+          renderEditBlock(block, edits, originals);
+          flashNote(block, REVERTED_NOTE);
+          deps.onChanged();
+        });
       }
     });
     root.addEventListener('input', function (event) {
