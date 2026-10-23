@@ -176,6 +176,8 @@ html[data-brand-color] #outReport .result-block:not(.is-closed) > .result-block-
 .brand-bar[hidden] { display: none; }
 .brand-bar-logo { display: block; max-height: 48px; max-width: 40%; }
 .brand-bar-logo[hidden] { display: none; }
+.print-only { display: none; }
+.client-line { margin: 0 0 8px; text-align: right; }
 .brand-bar-name { font-weight: bold; color: var(--color-brand, var(--color-text)); word-break: break-word; }
 .brand-logo-preview { display: block; max-height: 64px; max-width: 100%; margin: 0 0 8px; background: #fff; border: 1px solid var(--color-line); }
 .brand-logo-preview[hidden] { display: none; }
@@ -239,6 +241,10 @@ html[data-brand-color] #outReport .result-block:not(.is-closed) > .result-block-
   .result-table tr, .chart, .result-block-title { break-inside: avoid; }
   .result-block-title { break-after: avoid; }
   .brand-bar { break-after: avoid; }
+  .print-only:not([hidden]) { display: block; }
+  .brand-bar.print-only:not([hidden]) { display: flex; }
+  .client-line { break-after: avoid; }
+  .client-line:empty { display: none; }
   .chart-wrap { overflow: visible; border: 0; }
   .chart-wrap svg { max-width: 100%; height: auto; }
 }

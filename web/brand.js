@@ -210,14 +210,18 @@
         document.documentElement.style.removeProperty('--color-brand');
         document.documentElement.removeAttribute('data-brand-color');
       }
-      byId('outBrandBar').hidden = !brand.name && !brand.logo;
-      byId('outBrandBarName').textContent = brand.name;
-      setLogoImage(byId('imgBrandBarLogo'));
+      // 鑑定書の帯と、印刷だけに出す命式・運勢表の帯（同じ中身）
+      [['outBrandBar', 'outBrandBarName', 'imgBrandBarLogo'], ['outBrandBarCalc', 'outBrandBarCalcName', 'imgBrandBarCalcLogo']].forEach(function (ids) {
+        byId(ids[0]).hidden = !brand.name && !brand.logo;
+        byId(ids[1]).textContent = brand.name;
+        setLogoImage(byId(ids[2]));
+      });
       setLogoImage(byId('imgBrandLogoPreview'));
       byId('btnBrandLogoClear').hidden = !brand.logo;
       // 屋号の書体（画面の鑑定書の帯・見本）
       var family = readBrandFontFamily(brand.font);
       byId('outBrandBarName').style.fontFamily = family;
+      byId('outBrandBarCalcName').style.fontFamily = family;
       // 同じ画面の見本（鑑定書の頭・見出し・表の見出し。色は --color-brand で当たる）
       byId('outBrandSampleName').textContent = brand.name || '（屋号は未設定）';
       byId('outBrandSampleName').style.fontFamily = family;

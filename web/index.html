@@ -120,6 +120,9 @@
     <!-- 鑑定結果：計算結果（表の見た目）と鑑定書（紙の見た目）を分ける。鑑定書だけ送ることもあるため（2026-10-21） -->
     <div id="secResult" class="result-area" hidden>
     <section id="secCalc" class="card zone-calc" aria-labelledby="ttlResult">
+      <!-- 印刷だけ：命式・運勢表のページの始まりにも屋号の帯と「〇〇 様　鑑定日」を出す（2026-10-23 ガクさん） -->
+      <div id="outBrandBarCalc" class="brand-bar print-only" hidden><img id="imgBrandBarCalcLogo" class="brand-bar-logo" alt="" hidden><span id="outBrandBarCalcName" class="brand-bar-name"></span></div>
+      <p id="outClientLineCalc" class="client-line print-only"></p>
       <h3 id="ttlResult" class="zone-title">計算結果</h3>
       <div id="outInfo" class="result"></div>
       <h3 id="ttlMeishiki" class="result-group-title">命式詳細</h3>
@@ -144,6 +147,7 @@
 
     <section id="secReport" class="zone-report" aria-labelledby="ttlReport">
       <div id="outBrandBar" class="brand-bar" hidden><img id="imgBrandBarLogo" class="brand-bar-logo" alt="" hidden><span id="outBrandBarName" class="brand-bar-name"></span></div>
+      <p id="outClientLineReport" class="client-line print-only"></p>
       <h3 id="ttlReport" class="report-title">鑑定書</h3>
       <!-- 鑑定書の使い方（画面だけ。印刷・PDF には出さない）。鑑定文は参考の下書きで、鑑定士が解釈に合わせて書き直す前提（2026-10-23 ガクさん） -->
       <div class="report-guide" role="note">

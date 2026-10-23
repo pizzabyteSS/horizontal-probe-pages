@@ -227,6 +227,32 @@
     }).replace(/\u3000/g, ' ');
   }
 
+  var KANJI_DIGITS = '〇一二三四五六七八九';
+
+  /** 年の欄の文字を半角の数字4桁までにする（全角・漢数字は数字に直し、ほかの字は捨てる）。 */
+  function normalizeYearText(text) {
+    return toHalfWidth(text).replace(/[〇一二三四五六七八九]/g, function (ch) {
+      return String(KANJI_DIGITS.indexOf(ch));
+    }).replace(/[^0-9]/g, '').slice(0, 4);
+  }
+
+  /**
+   * 年の欄は、打った字をその場で半角の数字に直す（PC では「198６」のように全角が混ざって入るため。2026-10-23 ガクさん）。
+   * 変換の途中（IME で確定前）は触らず、確定したとき・欄を離れたときに直す
+   */
+  function bindYearInputs() {
+    ['inpYear', 'inpStartYear'].forEach(function (id) {
+      var input = byId(id);
+      var apply = function () {
+        var fixed = normalizeYearText(input.value);
+        if (fixed !== input.value) input.value = fixed;
+      };
+      input.addEventListener('input', function (event) { if (!event.isComposing) apply(); });
+      input.addEventListener('compositionend', apply);
+      input.addEventListener('blur', apply);
+    });
+  }
+
   function readInputForm() {
     var input = {};
     INPUT_FIELDS.forEach(function (field) {
@@ -367,6 +393,7 @@
   /** 前の鑑定の結果を消す（前のお客さんの内容を残さない。docs/web-screen-items.md §1 の 0）。 */
   function clearResult() {
     byId('outInfo').textContent = '';
+    renderClientLines(null);
     RESULT_GROUPS.forEach(function (group) { byId(group[0]).textContent = ''; });
     byId('secResult').hidden = true;
     closedKeys = {};
@@ -395,9 +422,24 @@
     return stored ? stored.rev : '';
   }
 
+  /** 印刷に出す「〇〇 様　鑑定日 …」（命式・運勢表と鑑定書の始まり。PDF の頭と同じ中身。2026-10-23 ガクさん）。model がなければ消す。 */
+  function renderClientLines(model) {
+    var text = '';
+    if (model) {
+      var info = model.info;
+      var parts = [];
+      if (info.name && info.name !== '-') parts.push(info.name + ' 様');
+      parts.push('鑑定日 ' + (info.kanteiDate || '-'));
+      text = parts.join('　');
+    }
+    byId('outClientLineCalc').textContent = text;
+    byId('outClientLineReport').textContent = text;
+  }
+
   /** 鑑定を画面に書き、端末に残す。draft があれば（続きから）閉じた項目・書き直し・メモ・控えを当てる。 */
   function showWork(work, draft) {
     VIEW.renderResultInfo(byId('outInfo'), work.model);
+    renderClientLines(work.model);
     RESULT_GROUPS.forEach(function (group) { VIEW.renderResultGroup(byId(group[0]), work.model, group[1]); });
     closedKeys = {};
     if (draft) Object.keys(draft.closedKeys).forEach(function (key) { closedKeys[key] = true; });
@@ -986,6 +1028,7 @@
     byId('btnKanteiStreak').addEventListener('click', handleKanteiStreakClick);
     byId('btnCopyRecords').addEventListener('click', handleCopyRecordsClick);
     byId('btnStartToday').addEventListener('click', fillStartDateToday);
+    bindYearInputs();
     byId('secResult').addEventListener('click', handleSectionToggleClick);
     byId('navToc').addEventListener('click', handleTocClick);
     byId('btnRelogin').addEventListener('click', handleReloginClick);
