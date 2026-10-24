@@ -836,7 +836,8 @@
     var text = '未ログイン';
     if (hasSession()) {
       // 鑑定の回数は無制限のため、回数は出さない（2026-10-21 決定。docs/product-spec.md §8 の 4）
-      text = session.loginId + '・' + new Date(session.expiresAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + 'まで';
+      // ログインの期限の時刻は出さない（何の時刻か伝わらないため。期限が切れたら案内を出してログインに戻す。2026-10-24 ガクさん）
+      text = session.loginId;
       // お試しの ID だけ、残りの回数を出す（「続きから」の計算し直しも1回に数える）
       if (typeof session.trialLeft === 'number') text += '・お試し 残り' + session.trialLeft + '回';
     }
