@@ -21,6 +21,7 @@
   var COLD_IDLE_MINUTES = 30;
   var STREAK_COUNT = 5;
   var LAST_CALL_STORAGE_KEY = 'hzWeb.lastCallAt';
+  var DEVICE_STORAGE_KEY = 'hzWeb.device';   // 端末の目印（でたらめな番号。ログインのときに送る。プライバシーポリシー §2・§5）
   var VERDICT_OUT_OF_SCOPE = '判定外';
   // 入力の初期値（hzGate の case A と同じ）。氏名は送る項目に入れない（サーバーも受け取らない）
   var SAMPLE_INPUT = {
@@ -59,6 +60,7 @@
     terms_required: '利用規約・プライバシーポリシーへの同意が必要です（内容を改めました）。お読みいただき、同意してから鑑定してください',
     terms_version: '画面が古いため同意できませんでした。ページを読み込み直してください',
     rate_limited: '短い時間に呼び出しが多すぎます',
+    trial_used: 'お試しの回数を使い切りました。続けてお使いいただくには、ココナラでご購入ください（ご購入後は同じ ID・パスワードのまま使えます）',
     busy: '混み合っています。少し待ってからやり直してください',
     invalid_input: '入力に誤りがあります',
     server_error: 'サーバーで失敗しました',
@@ -114,7 +116,8 @@
   function byId(id) { return document.getElementById(id); }
 
   // termsOk：いまの版の規約に同意済み。termsVersion：サーバーのいまの版（画面の版 VIEW.TERMS_VERSION と比べる）
-  function createEmptySession() { return { token: '', expiresAt: 0, used: null, loginId: '', termsOk: false, termsVersion: '' }; }
+  // trialLeft：お試しの ID の残りの回数（本購入の ID は null）
+  function createEmptySession() { return { token: '', expiresAt: 0, used: null, loginId: '', termsOk: false, termsVersion: '', trialLeft: null }; }
 
   function hasSession() { return session.token !== '' && session.expiresAt > Date.now(); }
 
@@ -154,6 +157,25 @@
 
   function writeLastCallAt(ms) {
     try { localStorage.setItem(LAST_CALL_STORAGE_KEY, String(ms)); } catch (e) { /* 保存できなくても計測は続ける */ }
+  }
+
+  /**
+   * 端末の目印（32桁の16進のでたらめな番号）。初めてのときに作って端末に残す。
+   * 端末に残せない・作れない環境では空（送らない。残せない番号を送ると、ログインのたびに別の端末に見えるため）。
+   */
+  function readDeviceId() {
+    try {
+      var v = localStorage.getItem(DEVICE_STORAGE_KEY);
+      if (/^[0-9a-f]{32}$/.test(v || '')) return v;
+      if (!window.crypto || !window.crypto.getRandomValues) return '';
+      var b = new Uint8Array(16), s = '', i;
+      window.crypto.getRandomValues(b);
+      for (i = 0; i < b.length; i++) s += (b[i] < 16 ? '0' : '') + b[i].toString(16);
+      localStorage.setItem(DEVICE_STORAGE_KEY, s);
+      return localStorage.getItem(DEVICE_STORAGE_KEY) === s ? s : '';
+    } catch (e) {
+      return '';
+    }
   }
 
   /** 前回の呼び出しからの時間と、「冷えた1回目」の条件（30分以上）を満たすか。記録がなければ満たさない扱い。 */
@@ -815,6 +837,8 @@
     if (hasSession()) {
       // 鑑定の回数は無制限のため、回数は出さない（2026-10-21 決定。docs/product-spec.md §8 の 4）
       text = session.loginId + '・' + new Date(session.expiresAt).toLocaleTimeString('ja-JP', { hour: '2-digit', minute: '2-digit' }) + 'まで';
+      // お試しの ID だけ、残りの回数を出す（「続きから」の計算し直しも1回に数える）
+      if (typeof session.trialLeft === 'number') text += '・お試し 残り' + session.trialLeft + '回';
     }
     byId('outSession').textContent = text;
   }
@@ -832,6 +856,8 @@
 
   function updateUsage(json) {
     if (typeof json.used === 'number') session.used = json.used;
+    if (typeof json.trialLeft === 'number') session.trialLeft = json.trialLeft;
+    else if (json.ok) session.trialLeft = null;   // 成功の応答に残りがない＝本購入（ログイン中に切り替わった場合も消す）
   }
 
   // ---- 操作 ----
@@ -845,13 +871,17 @@
       return;
     }
     setBusy(true);
-    postAction({ action: 'web_login', id: id, pw: pw }).then(function (result) {
+    var loginReq = { action: 'web_login', id: id, pw: pw };
+    var dev = readDeviceId();
+    if (dev) loginReq.dev = dev;
+    postAction(loginReq).then(function (result) {
       byId('inpLoginPw').value = '';   // パスワードは画面に残さない
       var json = result.json;
       if (json.ok) {
         // 同意の要否を返さないサーバー（同意の仕組みの前の版）では、同意済みとして扱う
         session = { token: json.token, expiresAt: json.expiresAt, used: json.used, loginId: id,
-          termsOk: json.agreeRequired !== true, termsVersion: String(json.termsVersion || '') };
+          termsOk: json.agreeRequired !== true, termsVersion: String(json.termsVersion || ''),
+          trialLeft: typeof json.trialLeft === 'number' ? json.trialLeft : null };
         renderMessage('outAgreeMessage', '', false);
         needsRelogin = false;
         clearDraftProblem();
