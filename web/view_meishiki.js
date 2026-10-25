@@ -11,7 +11,7 @@
   // _data の行番号（master_gss/output_data.js の DATA_ROW と、writeS02Sheet_ に直書きされた行）
   var ROW = {
     STEM: 3, BRANCH: 4, KANSHI: 5, STEM_IDX: 6, BRANCH_IDX: 7, TSUHEN: 11, JUNIUN: 12, URA_JUNIUN: 17,
-    ZOKAN: [8, 9, 10], ZOKAN_TSUHEN: [14, 15, 16],
+    ZOKAN: 8, ZOKAN_TSUHEN: 14,
     KUUBOU: 20, ISHIKI: 21, GOSHUGOSIN: 28,
     STAR_START: 325, STAR_COUNT: 4,
     BALANCE_START: 238,
@@ -78,12 +78,9 @@
       ['干支'].concat(readPillarCells(table, ROW.KANSHI)),
       ['干支番号'].concat(buildKanshiNumbers(table)),
       ['通変星'].concat(readPillarCells(table, ROW.TSUHEN)),
-      ['蔵干（本気）'].concat(readPillarCells(table, ROW.ZOKAN[0])),
-      ['蔵干（中気）'].concat(readPillarCells(table, ROW.ZOKAN[1])),
-      ['蔵干（余気）'].concat(readPillarCells(table, ROW.ZOKAN[2])),
-      ['蔵干通変星（本気）'].concat(readPillarCells(table, ROW.ZOKAN_TSUHEN[0])),
-      ['蔵干通変星（中気）'].concat(readPillarCells(table, ROW.ZOKAN_TSUHEN[1])),
-      ['蔵干通変星（余気）'].concat(readPillarCells(table, ROW.ZOKAN_TSUHEN[2])),
+      // 蔵干は節入り後日数で選んだ1干（_data の8行目・14行目。9・10・15・16行目は空。2026-10-25）
+      ['蔵干'].concat(readPillarCells(table, ROW.ZOKAN)),
+      ['蔵干通変星'].concat(readPillarCells(table, ROW.ZOKAN_TSUHEN)),
       ['十二運'].concat(readPillarCells(table, ROW.JUNIUN)),
       ['裏十二運'].concat(readPillarCells(table, ROW.URA_JUNIUN))
     ];

@@ -1,1 +1,1 @@
-window.HZ_WEB_CONFIG = { endpoint: 'https://script.google.com/macros/s/AKfycbzvaCVE76k-_lVF_6fwXBipAzS76S3HUGLEkD-SW3W0CiO4622rZnEYz-sH8qPiylS4eQ/exec', commit: '85c73fe', builtAt: '2026-10-24T06:31:25Z' };
+window.HZ_WEB_CONFIG = { endpoint: 'https://script.google.com/macros/s/AKfycbzvaCVE76k-_lVF_6fwXBipAzS76S3HUGLEkD-SW3W0CiO4622rZnEYz-sH8qPiylS4eQ/exec', commit: '5d1fa99', builtAt: '2026-10-25T08:52:52Z' };
