@@ -72,8 +72,8 @@
     {
       title: '第1章｜性格と才能', summaryKey: 'KANTEI_SUMMARY_CH1', icon: { name: 'star', color: '#3f6fb0' },
       figures: ['pillars', 'meter'],
-      tip: '日干＝生まれた日の天干。あなた自身を表す文字で、読み解きの中心になります。日干身強弱＝日干のエネルギーの強さ。強いほど自分の力で進み、弱いほど周りの助けを活かして伸びます。',
-      mainItems: [['日干', 'NIKKAN_KEY', 'KANTEI_MEANING_NIKKAN'], ['日干身強弱', 'STR_LABEL_KEY', 'KANTEI_MEANING_STRENGTH']],
+      tip: '日干＝生まれた日の天干。あなた自身を表す文字で、読み解きの中心になります。日干強弱＝日干のエネルギーの強さ。強いほど自分の力で進み、弱いほど周りの助けを活かして伸びます。',
+      mainItems: [['日干', 'NIKKAN_KEY', 'KANTEI_MEANING_NIKKAN'], ['日干強弱', 'STR_LABEL_KEY', 'KANTEI_MEANING_STRENGTH']],
       subItems: [['天干通変星', 'GETSU_TSUHEN_KEY', 'KANTEI_MEANING_TENGAN_GOD'], ['五行バランス', 'BIAS_TYPE_KEY', 'KANTEI_MEANING_BIAS']],
       reports: [['あなたの基本性質', 'KANTEI_REPORT_CH1_BASIC'], ['あなたの強み', 'KANTEI_REPORT_CH1_STRENGTH'], ['才能を活かす鍵', 'KANTEI_REPORT_CH1_TALENT']]
     },
@@ -170,8 +170,8 @@
   // 本文を再び載せる所（一言・今日からできること）は、本文と同じキーにする（どちらで書き直しても両方が同じ文になる）
   var GLANCE = {
     key: 'report.glance', title: 'ひと目でわかるあなた',
-    // キーワード3つ：日干・日干身強弱・月柱の天干の通変星（案A。オーソドックスで正確な組み合わせ。2026-10-27 ガクさん）
-    keywordItems: [['日干', 'NIKKAN_KEY'], ['日干身強弱', 'STR_LABEL_KEY'], ['月柱の天干の通変星', 'GETSU_TSUHEN_KEY']],
+    // キーワード3つ：日干・日干強弱・月柱の天干の通変星（案A。オーソドックスで正確な組み合わせ。2026-10-27 ガクさん）
+    keywordItems: [['日干', 'NIKKAN_KEY'], ['日干強弱', 'STR_LABEL_KEY'], ['月柱の天干の通変星', 'GETSU_TSUHEN_KEY']],
     keywordEditKey: 'WEB_GLANCE_KEYWORDS', fortuneEditKey: 'WEB_GLANCE_FORTUNE'
   };
   var KEYWORD_SEPARATOR = '｜';
