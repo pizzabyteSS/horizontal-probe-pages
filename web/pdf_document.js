@@ -2,7 +2,8 @@
 // web/src/pdf_document.js — 鑑定書 PDF・画像の中身を組み立て、ファイルにする入口（段階3a-1・3a-2）
 // 設計：docs/web-pdf-plan.md §4.2〜§4.6、docs/product-spec.md §4.1・§4.2
 //   中身は画面と同じ項目の一覧（view_result.js の buildResultModel）のうち、開いている項目だけ（3a-2）
-//   1ページ目の最初に鑑定情報を必ず置く（閉じられない。R4）。各ページの上に屋号・氏名 様・鑑定日、下に n / N
+//   1ページ目の最初に鑑定情報を必ず置く（閉じられない。R4。鑑定書だけのときは、その上に「ひと目でわかるあなた」）。
+//   各ページの上に屋号・氏名 様・鑑定日、下に n / N
 //   表はすべて表のまま載せる（行ごとのまとまりは見づらいため。2026-10-21 ガクさん）。
 //   運勢表（大運表〜日運表）は列が多いため A4 横のページに置く。命式詳細のミニ表（大運・年運・月運）は縦のページのまま
 //   作ったものはメモリに置くだけで、端末にもサーバーにも残さない
@@ -20,23 +21,31 @@
   var UNSAFE_FILE_CHARS = /[\\/:*?"<>|\u0000-\u001F]/g;   // ファイル名に使えない字
   var LANDSCAPE_SECTION_PREFIX = 'fortune.';   // 横向きのページに置く項目（運勢表。view_fortune.js の項目のキー）
 
-  /** 改行を含む文を段落の部品にする（空の文は足さない）。 */
-  function pushParagraph(blocks, text) {
+  /** 改行を含む文を段落の部品にする（空の文は足さない）。tone は字の形（'tip'・'lead'。省いたら本文）。 */
+  function pushParagraph(blocks, text, tone) {
     if (VIEW.isBlank(text) || !String(text).replace(/\s/g, '')) return;
-    blocks.push({ type: 'paragraph', text: String(text) });
+    var block = { type: 'paragraph', text: String(text) };
+    if (tone) block.tone = tone;
+    blocks.push(block);
   }
 
-  /** 項目の部品を PDF の部品にする。画面の h4 → 見出し2、h5 → 見出し3。 */
+  /** 項目の部品を PDF の部品にする。画面の h4 → 見出し2、h5 → 見出し3。枠（boxStart・boxEnd）・図はそのまま渡す。 */
   function pushPartBlocks(blocks, part) {
     if (part.type === 'heading') blocks.push({ type: 'heading', level: part.level >= 5 ? 3 : 2, text: part.text });
-    else if (part.type === 'lines') pushParagraph(blocks, part.text);
-    else if (part.type === 'chart') blocks.push({ type: 'chart', title: part.title, points: part.points, color: part.color });
+    else if (part.type === 'lines') pushParagraph(blocks, part.text, part.tone);
+    else if (part.type === 'boxStart') blocks.push({ type: 'boxStart', tone: part.tone, color: part.color });   // tone 'key'：要の一文の枠
+    else if (part.type === 'boxEnd') blocks.push({ type: 'boxEnd' });
+    else if (part.type === 'chart') {
+      blocks.push({ type: 'chart', title: part.title, points: part.points, color: part.color, markIndex: part.markIndex, markLabel: part.markLabel });
+    } else if (part.type === 'figure') blocks.push({ type: 'figure', figure: part });   // 鑑定書の図（形は view_figure.js の layoutFigure）
     else if (part.type === 'table') blocks.push({ type: 'table', headers: part.headers, rows: part.rows });
   }
 
-  /** 項目1つ（題名は見出し1）。 */
+  /** 項目1つ（題名は見出し1。章のアイコンがあれば字の前に描く）。 */
   function buildSectionBlocks(section) {
-    var blocks = [{ type: 'heading', level: 1, text: section.title }];
+    var heading = { type: 'heading', level: 1, text: section.title };
+    if (section.icon) heading.icon = section.icon;
+    var blocks = [heading];
     section.parts.forEach(function (part) { pushPartBlocks(blocks, part); });
     return blocks;
   }
@@ -56,10 +65,23 @@
     // 計算結果と鑑定書の両方を載せるときは、鑑定書を新しいページの題名「鑑定書」から始める
     //   （計算結果の後にいきなり第1章が来て、鑑定書の始まりが分からなかった。2026-10-23 ガクさん）
     var hasBoth = sections.some(isReport) && sections.some(function (section) { return !isReport(section); });
-    var blocks = [{ type: 'title', text: hasBoth ? CALC_TITLE : DOCUMENT_TITLE }].concat(buildSectionBlocks(VIEW.buildInfoSection(model.info)));
+    // 鑑定書だけのときは、題名のすぐ下に「ひと目でわかるあなた」、鑑定情報はその下（2026-10-27 案1）。
+    //   両方のときは、鑑定書の始まり（題名「鑑定書」）の下に来る（鑑定書の項目の先頭のため）
+    var glance = hasBoth ? null : sections.filter(function (section) { return section.key === VIEW.REPORT_GLANCE_KEY; })[0] || null;
+    var blocks = [{ type: 'title', text: hasBoth ? CALC_TITLE : DOCUMENT_TITLE }]
+      .concat(glance ? buildSectionBlocks(glance) : [])
+      .concat(buildSectionBlocks(VIEW.buildInfoSection(model.info)));
     var orientation = 'portrait';
     var reportStarted = false;
+    // 1ページ目は「ひと目でわかるあなた」と鑑定情報だけにし、続く項目は2ページ目から（章の頭だけが1ページ目の下に残らない）
+    if (glance) blocks.push({ type: 'page', orientation: 'portrait', breakBefore: true });
     sections.forEach(function (section) {
+      if (section === glance) return;
+      // 「今日からできること」は最後のページ（新しいページから。2026-10-27 案9）。題名の直後なら改めない
+      if (section.key === VIEW.REPORT_TODAY_KEY && blocks[blocks.length - 1].type !== 'title') {
+        blocks.push({ type: 'page', orientation: 'portrait', breakBefore: true });
+        orientation = 'portrait';
+      }
       if (hasBoth && !reportStarted && isReport(section)) {
         reportStarted = true;
         blocks.push({ type: 'page', orientation: 'portrait', breakBefore: true });

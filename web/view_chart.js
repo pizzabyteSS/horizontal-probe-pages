@@ -22,6 +22,7 @@
   var AXIS_FONT_PX = 11;         // 横軸の文字の大きさ（app.css の .chart-axis と同じ）
   var LABEL_PADDING = 6;         // 隣の文字との間
   var POINT_RADIUS = 3;
+  var MARK_COLOR = 'var(--color-brand, #0969da)';   // 印（今年など）の色（設定の色。決めていなければ --color-accent と同じ）
 
   function createSvg(tag, attributes, text) {
     var element = document.createElementNS(SVG_NS, tag);
@@ -44,9 +45,9 @@
 
   /**
    * 折れ線グラフを parent に足す。points は [{ label, value }]（value は数値）。点がなければ何も足さない。
-   * color は GSS 版の色。title はグラフの見出し。
+   * color は GSS 版の色。title はグラフの見出し。markIndex があればその点に縦の線と markLabel（鑑定書の年運の「今年」）
    */
-  function appendLineChart(parent, title, points, color) {
+  function appendLineChart(parent, title, points, color, markIndex, markLabel) {
     if (!points.length) return null;
     // 一番長い横軸の文字が1点ぶんの幅に収まらなければ斜めにし、下の余白をその長さに合わせる
     var longest = Math.max.apply(null, points.map(function (point) { return estimateLabelWidth(point.label); }));
@@ -67,6 +68,12 @@
       var y = toY(tick);
       svg.appendChild(createSvg('line', { x1: PLOT_LEFT, x2: width - PLOT_RIGHT, y1: y, y2: y, class: 'chart-grid' }));
       svg.appendChild(createSvg('text', { x: PLOT_LEFT - 6, y: y + 4, class: 'chart-axis', 'text-anchor': 'end' }, tick));
+    }
+
+    if (markIndex >= 0 && markIndex < points.length) {
+      var markX = toX(markIndex);
+      svg.appendChild(createSvg('line', { x1: markX, x2: markX, y1: PLOT_TOP, y2: PLOT_TOP + plotHeight, class: 'chart-mark', style: 'stroke: ' + MARK_COLOR }));
+      svg.appendChild(createSvg('text', { x: markX + 4, y: PLOT_TOP + 10, class: 'chart-mark-label', style: 'fill: ' + MARK_COLOR }, markLabel || ''));
     }
 
     var path = points.map(function (point, i) { return (i ? 'L' : 'M') + toX(i) + ' ' + toY(point.value); }).join(' ');

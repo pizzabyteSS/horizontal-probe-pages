@@ -5,7 +5,7 @@
 //   文字の幅は measure(文字, フォント) で受け取る（画面ではキャンバスで測る。手元の試験では差し替える）
 //   決まり：どの行も本文の幅を超えない（ぶら下げなし）／段落は行の単位、表は行の単位で次のページへ送る／
 //   表がページをまたいだら見出しの行を繰り返す／見出しはその後ろに最低2行が入らなければ次のページへ送る／
-//   グラフは1ページに収める
+//   グラフ・図は1ページに収める
 //   ページの向き：既定は A4 縦。部品 { type: 'page', orientation: 'landscape' } で以降を A4 横にする（運勢表。2026-10-21）。
 //   各ページは向き・大きさを持つ（pages[i].width・height・widthPt・heightPt）
 // 書き方の決まり：web/README.md
@@ -57,6 +57,8 @@
     heading2: { size: 27, weight: 'bold', color: '#1f2328', before: 18, after: 4 },
     heading3: { size: 26, weight: 'bold', color: '#59636e', before: 12, after: 2 },
     body: { size: 26, weight: 'normal', color: '#1f2328', before: 0, after: 10 },
+    tip: { size: 22, weight: 'normal', color: '#59636e', before: 0, after: 8 },      // 豆知識・用語の添え書き（tone 'tip'）
+    lead: { size: 32, weight: 'bold', color: '#1f2328', before: 0, after: 12 },     // ひと目でわかるあなたのキーワード（tone 'lead'）
     table: { size: 22, weight: 'normal', color: '#1f2328' },
     tableHead: { size: 22, weight: 'bold', color: '#1f2328' },
     page: { size: 20, weight: 'normal', color: '#59636e' },
@@ -70,8 +72,23 @@
   var TABLE_HEAD_BRAND_TEXT = '#ffffff';   // 色を決めたときの表の見出しの字（色は brand.js の候補。どれも白地で読める＝白字も読める）
   var CHART_HEIGHT = 460;     // 題名を含むグラフ1つの高さ
   var CHART_AFTER = 16;
+  var FIGURE_AFTER = 16;      // 鑑定書の図（部品 figure）の下の余白
+  var MARK_COLOR_DEFAULT = '#0969da';   // 年運の「今年」の印の色（屋号の色がなければ。view_figure.js の FIGURE_ACCENT_DEFAULT と同じ）
   var MIN_LINES_AFTER_HEADING = 2;
   var NOTE_RULE_GAP = 12;     // 注記の区切り線と文の間
+  // 枠（部品 boxStart〜boxEnd。鑑定書の「鑑定の根拠」）：本文の幅の外へ少し広げて塗る（中の部品の幅・位置は変えない）
+  var BOX_FILL = '#f4f6f8';
+  var BOX_STROKE = '#d1d9e0';
+  var BOX_OUTSET = 16;        // 本文の左右から外へ広げる幅（余白 MARGIN の内側に収まる）
+  var BOX_PAD = 16;           // 枠の上下の内側の余白
+  var BOX_AFTER = 16;         // 枠の下の余白
+  var BOX_CELL_FILL = '#ffffff';   // 枠の中の表の値のセル（塗りなしだと枠の色が透けて読みにくい）
+  // 要の一文の枠（tone 'key'。段階3）：薄い地に、左へ章の色の線
+  var KEY_BOX_FILL = '#fafbfc';
+  var KEY_BOX_STROKE = '#e6e1d6';
+  var KEY_BAR_WIDTH = 8;
+  var ICON_GAP = 14;          // 章のアイコンと見出しの字の間
+  var TERM_SEPARATOR = '：';  // tone 'terms'：各行の「：」の前（用語）を太字にする（用語ミニ辞典）
 
   // ---- 禁則（docs/web-pdf-plan.md §4.3） ----
   var NO_LINE_START = '、。，．・：；？！ー）」』】〕〉》ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶ,.:;?!)]}';
@@ -235,11 +252,27 @@
   }
 
   function createCursor(bodyTop) {
-    var cursor = { pages: [], page: null, y: bodyTop, geo: GEOMETRY.portrait, bodyHeight: GEOMETRY.portrait.bodyBottom - bodyTop };
+    // box：枠の中にいる間の { y：このページで枠が始まる高さ }（枠の外なら null）
+    var cursor = { pages: [], page: null, y: bodyTop, geo: GEOMETRY.portrait, bodyHeight: GEOMETRY.portrait.bodyBottom - bodyTop, box: null };
+    /** いまのページに、枠の y〜y1 の塗りを足す（ページの項目の先頭に置き、表・文字より先に描く）。 */
+    cursor.closeBoxSegment = function (y1) {
+      if (!cursor.box || y1 <= cursor.box.y) return;
+      var isKey = cursor.box.tone === 'key';
+      var box = { kind: 'box', x: CONTENT_LEFT - BOX_OUTSET, y: cursor.box.y, w: cursor.geo.contentWidth + BOX_OUTSET * 2,
+        h: y1 - cursor.box.y, fill: isKey ? KEY_BOX_FILL : BOX_FILL, stroke: isKey ? KEY_BOX_STROKE : BOX_STROKE, tag: { role: 'box' } };
+      if (isKey && cursor.box.color) { box.barColor = cursor.box.color; box.barWidth = KEY_BAR_WIDTH; }
+      cursor.page.items.unshift(box);
+    };
+    /** 新しいページ。枠の中でページが変わったら、前のページの枠を下端まで塗り、新しいページの上から枠を続ける。 */
     cursor.newPage = function () {
+      if (cursor.box && cursor.page) cursor.closeBoxSegment(cursor.geo.bodyBottom);
       cursor.page = createPage(cursor.geo);
       cursor.pages.push(cursor.page);
       cursor.y = bodyTop;
+      if (cursor.box) {
+        cursor.box.y = bodyTop;
+        cursor.y = bodyTop + BOX_PAD / 2;
+      }
     };
     /** 以降のページの向きを変える。いまのページが空ならそのページを替え、そうでなければ次のページから。 */
     /** 以降のページの向きを変える。breakBefore なら向きが同じでも新しいページから始める（ページが空なら何もしない）。 */
@@ -276,6 +309,7 @@
   function styleOfBlock(block) {
     if (block.type === 'title') return STYLE.title;
     if (block.type === 'heading') return STYLE['heading' + (block.level || 1)] || STYLE.heading1;
+    if (block.type === 'paragraph' && (block.tone === 'tip' || block.tone === 'lead')) return STYLE[block.tone];
     return STYLE.body;
   }
 
@@ -298,8 +332,14 @@
     var block = blocks[index];
     if (!block) return 0;
     if (block.type === 'paragraph') {
-      var lines = wrapBlockLines(block, STYLE.body, measure, charWidth, contentWidth);
-      return Math.min(MIN_LINES_AFTER_HEADING, lines.length) * lineHeightOf(STYLE.body);
+      var paragraphStyle = styleOfBlock(block);
+      var lines = wrapBlockLines(block, paragraphStyle, measure, charWidth, contentWidth);
+      return Math.min(MIN_LINES_AFTER_HEADING, lines.length) * lineHeightOf(paragraphStyle);
+    }
+    if (block.type === 'boxStart') {   // 枠の上の余白と、枠の中の最初の部品（見出しならその上の余白も）
+      var inner = blocks[index + 1];
+      var innerBefore = inner && (inner.type === 'title' || inner.type === 'heading') ? styleOfBlock(inner).before : 0;
+      return BOX_PAD + innerBefore + measureBlockStart(blocks, index + 1, measure, charWidth, widthsCache, bodyHeight, contentWidth);
     }
     if (block.type === 'note') {   // 注記は区切り線ごと1つのまとまり（見出しだけをページの終わりに残さない。Codex P2）
       var noteLines = wrapBlockLines(block, STYLE.note, measure, charWidth, contentWidth);
@@ -312,6 +352,7 @@
       return Math.min(head + first, bodyHeight);
     }
     if (block.type === 'chart') return CHART_HEIGHT;
+    if (block.type === 'figure') return measureFigure(block, contentWidth).h;
     if (block.type === 'title' || block.type === 'heading') {
       var style = styleOfBlock(block);
       var own = wrapBlockLines(block, style, measure, charWidth, contentWidth).length * lineHeightOf(style) + style.after;
@@ -325,27 +366,87 @@
   function placeHeading(cursor, blocks, index, measure, charWidth, widthsCache) {
     var block = blocks[index];
     var style = styleOfBlock(block);
-    var lines = wrapBlockLines(block, style, measure, charWidth, cursor.geo.contentWidth);
+    var iconRoom = block.icon ? lineHeightOf(style) + ICON_GAP : 0;   // 章のアイコン（段階3）は1行目の字の前
+    var lines = wrapBlockLines(block, style, measure, charWidth, cursor.geo.contentWidth - iconRoom);
     var before = cursor.isTop() ? 0 : style.before;
     var need = before + measureBlockStart(blocks, index, measure, charWidth, widthsCache, cursor.bodyHeight, cursor.geo.contentWidth);
     if (!cursor.isTop() && need > cursor.remaining()) { cursor.newPage(); before = 0; }
     cursor.y += before;
+    if (block.icon) addIconItem(cursor, block.icon, CONTENT_LEFT, cursor.y, lineHeightOf(style), index);
     lines.forEach(function (line) {
-      addTextItem(cursor, CONTENT_LEFT, cursor.y, line, style, measure, { block: index, role: 'heading' });
+      addTextItem(cursor, CONTENT_LEFT + iconRoom, cursor.y, line, style, measure, { block: index, role: 'heading' });
       cursor.y += lineHeightOf(style);
+    });
+    cursor.y += style.after;
+  }
+
+  /** 章のアイコンを足す（図と同じ描き方。形は view_figure.js の layoutIcon。色は章の色のまま）。 */
+  function addIconItem(cursor, icon, x, y, size, index) {
+    var shape = VIEW.layoutIcon(icon);
+    if (!shape) return;
+    cursor.add({ kind: 'figure', x: x, y: y, w: size, h: size, scale: size / shape.width, shapes: shape.shapes, accent: icon.color, isIcon: true,
+      tag: { block: index, role: 'icon' } });
+  }
+
+  /**
+   * 各行の「：」の前（用語）を太字にする段落（tone 'terms'。用語ミニ辞典）。太字の分だけ幅を狭めて割り、
+   * 行の頭が用語のとき（元の行の1行目）は、用語を太字・残りを本文の字で並べて描く
+   */
+  function placeTermParagraph(cursor, blocks, index, measure, charWidth) {
+    var block = blocks[index];
+    var style = STYLE.body;
+    var bold = { size: style.size, weight: 'bold', color: style.color };
+    var lineHeight = lineHeightOf(style);
+    var lineNo = 0;
+    String(block.text).split('\n').forEach(function (source) {
+      var at = source.indexOf(TERM_SEPARATOR);
+      var term = at > 0 ? source.slice(0, at) : '';
+      var extra = term ? Math.max(0, measure(term, formatFont(bold)) - measure(term, formatFont(style))) : 0;
+      wrapText(source, cursor.geo.contentWidth - extra, measure, formatFont(style), charWidth).forEach(function (line, i) {
+        if (lineHeight > cursor.remaining()) cursor.newPage();
+        var tag = { block: index, role: 'line', line: lineNo++ };
+        if (i === 0 && term && line.indexOf(term) === 0) {
+          addTextItem(cursor, CONTENT_LEFT, cursor.y, term, bold, measure, tag);
+          var rest = line.slice(term.length);
+          if (rest) addTextItem(cursor, CONTENT_LEFT + measure(term, formatFont(bold)), cursor.y, rest, style, measure, tag);
+        } else {
+          addTextItem(cursor, CONTENT_LEFT, cursor.y, line, style, measure, tag);
+        }
+        cursor.y += lineHeight;
+      });
     });
     cursor.y += style.after;
   }
 
   function placeParagraph(cursor, blocks, index, measure, charWidth) {
     var block = blocks[index];
-    var lineHeight = lineHeightOf(STYLE.body);
-    wrapBlockLines(block, STYLE.body, measure, charWidth, cursor.geo.contentWidth).forEach(function (line, i) {
+    if (block.tone === 'terms') { placeTermParagraph(cursor, blocks, index, measure, charWidth); return; }
+    var style = styleOfBlock(block);
+    var lineHeight = lineHeightOf(style);
+    wrapBlockLines(block, style, measure, charWidth, cursor.geo.contentWidth).forEach(function (line, i) {
       if (lineHeight > cursor.remaining()) cursor.newPage();
-      addTextItem(cursor, CONTENT_LEFT, cursor.y, line, STYLE.body, measure, { block: index, role: 'line', line: i });
+      addTextItem(cursor, CONTENT_LEFT, cursor.y, line, style, measure, { block: index, role: 'line', line: i });
       cursor.y += lineHeight;
     });
-    cursor.y += STYLE.body.after;
+    cursor.y += style.after;
+  }
+
+  /**
+   * 枠の始まり。枠の上の余白と中の最初の部品が入らなければ、次のページから始める（枠の上の端だけをページの終わりに残さない）
+   */
+  function placeBoxStart(cursor, blocks, index, measure, charWidth, widthsCache) {
+    var need = measureBlockStart(blocks, index, measure, charWidth, widthsCache, cursor.bodyHeight, cursor.geo.contentWidth);
+    if (!cursor.isTop() && need > cursor.remaining()) cursor.newPage();
+    cursor.box = { y: cursor.y, tone: blocks[index].tone || '', color: blocks[index].color || '' };
+    cursor.y += BOX_PAD;
+  }
+
+  /** 枠の終わり。前の部品の下の余白を枠の下の余白にして塗り、枠の下に余白を空ける。 */
+  function placeBoxEnd(cursor) {
+    if (!cursor.box) return;
+    cursor.closeBoxSegment(Math.min(cursor.y, cursor.geo.bodyBottom));
+    cursor.box = null;
+    cursor.y += BOX_AFTER;
   }
 
   /**
@@ -375,7 +476,7 @@
     var height = (toLine - fromLine) * lineHeight + CELL_PADDING * 2;
     var x = CONTENT_LEFT;
     widths.forEach(function (w, c) {
-      var fill = isHead ? TABLE_HEAD_FILL : (c === 0 ? TABLE_ROW_HEAD_FILL : null);
+      var fill = isHead ? TABLE_HEAD_FILL : (c === 0 ? TABLE_ROW_HEAD_FILL : (cursor.box ? BOX_CELL_FILL : null));
       cursor.add({ kind: 'cell', x: x, y: cursor.y, w: w, h: height, fill: fill, stroke: TABLE_LINE_COLOR, tag: tag, isTableHead: isHead });
       var style = isHead || c === 0 ? STYLE.tableHead : STYLE.table;
       shape.cells[c].slice(fromLine, toLine).forEach(function (line, i) {
@@ -429,8 +530,27 @@
     if (!block.points || !block.points.length) return;
     if (CHART_HEIGHT > cursor.remaining()) cursor.newPage();
     cursor.add({ kind: 'chart', x: CONTENT_LEFT, y: cursor.y, w: cursor.geo.contentWidth, h: CHART_HEIGHT,
-      title: block.title, points: block.points, color: block.color, tag: { block: index, role: 'chart' } });
+      title: block.title, points: block.points, color: block.color, markIndex: block.markIndex, markLabel: block.markLabel,
+      markColor: MARK_COLOR_DEFAULT, tag: { block: index, role: 'chart' } });
     cursor.y += CHART_HEIGHT + CHART_AFTER;
+  }
+
+  /** 図の形と、本文の幅に広げた大きさ（view_figure.js の layoutFigure を PDF 用の幅で組み、scale 倍で描く）。 */
+  function measureFigure(block, contentWidth) {
+    var shape = VIEW.layoutFigure(block.figure, VIEW.FIGURE_PDF_DESIGN_WIDTH);
+    if (!shape) return { shape: null, h: 0, scale: 1 };
+    var scale = contentWidth / shape.width;
+    return { shape: shape, h: Math.ceil(shape.height * scale), scale: scale };
+  }
+
+  /** 図は1ページに収める（入らなければ次のページへ）。 */
+  function placeFigure(cursor, blocks, index) {
+    var figure = measureFigure(blocks[index], cursor.geo.contentWidth);
+    if (!figure.shape) return;
+    if (!cursor.isTop() && figure.h > cursor.remaining()) cursor.newPage();
+    cursor.add({ kind: 'figure', x: CONTENT_LEFT, y: cursor.y, w: cursor.geo.contentWidth, h: figure.h, scale: figure.scale,
+      shapes: figure.shape.shapes, accent: VIEW.FIGURE_ACCENT_DEFAULT, tag: { block: index, role: 'figure' } });
+    cursor.y += figure.h + FIGURE_AFTER;
   }
 
   /** ロゴを描く大きさ（高さ LOGO_HEIGHT。横に長すぎれば幅の上限に合わせて縮める）。 */
@@ -480,6 +600,9 @@
     if (!color) return;
     pages.forEach(function (page) {
       page.items.forEach(function (item) {
+        // 図の強調（日柱・今ここ・針）と年運の「今年」の印も屋号の色にする（画面と同じ）
+        if (item.kind === 'figure') { if (!item.isIcon) item.accent = color; return; }   // 章のアイコンは章の色のまま
+        if (item.kind === 'chart') { item.markColor = color; return; }
         // 表の見出しの行も色で塗り、字を白にする（画面・印刷と同じ。灰色のままだとデザインが変わった感じがしなかった。2026-10-23 ガクさん）
         if (item.isTableHead) {
           if (item.kind === 'cell') { item.fill = color; item.stroke = color; } else if (item.kind === 'text') item.color = TABLE_HEAD_BRAND_TEXT;
@@ -495,8 +618,13 @@
   /**
    * 中身をページに割る。doc は { header: { name, kanteiDate, brandName, brandColor, brandLogo: { width, height } または null }, blocks: [部品] }。
    * 部品：{ type: 'title'|'heading', level, text } / { type: 'paragraph', text } / { type: 'note', text }（末尾の注記。右寄せ・小さめ・区切り線） /
-   *       { type: 'table', headers: [..] または null, rows: [[..]] } / { type: 'chart', title, points: [{ label, value }], color } /
-   *       { type: 'page', orientation: 'portrait'|'landscape', breakBefore }（以降のページの向き。breakBefore なら新しいページから）
+   *       { type: 'table', headers: [..] または null, rows: [[..]] } / { type: 'chart', title, points: [{ label, value }], color, markIndex, markLabel } /
+   *       { type: 'figure', figure: 画面の部品 figure }（鑑定書の図。1ページに収める。描く項目は { kind: 'figure', x, y, w, h, scale, shapes, accent }） /
+   *       { type: 'page', orientation: 'portrait'|'landscape', breakBefore }（以降のページの向き。breakBefore なら新しいページから） /
+   *       { type: 'boxStart' } … { type: 'boxEnd' }（間の部品を薄い色の枠で囲む。ページをまたげばページごとに塗る）。
+   *       段落の tone：'tip'（小さめの灰色）・'lead'（大きめの太字）・'terms'（各行の「：」の前を太字）。
+   *       見出しの icon：{ name, color }（章のアイコン。1行目の字の前）。枠の tone 'key'：要の一文の枠（左に color の線）
+   *   枠は { kind: 'box', x, y, w, h, fill, stroke }（ページの項目の先頭）
    * 返す値：[{ items: [描く項目], orientation, width, height, widthPt, heightPt }]。項目の座標はページの左上が 0。
    *   ロゴは { kind: 'image' }（描くときに画像を渡す）
    */
@@ -518,7 +646,11 @@
       else if (block.type === 'note') placeNote(cursor, doc.blocks, index, measure, charWidth);
       else if (block.type === 'table') placeTable(cursor, doc.blocks, index, measure, charWidth, widthsCache);
       else if (block.type === 'chart') placeChart(cursor, doc.blocks, index);
+      else if (block.type === 'figure') placeFigure(cursor, doc.blocks, index);
+      else if (block.type === 'boxStart') placeBoxStart(cursor, doc.blocks, index, measure, charWidth, widthsCache);
+      else if (block.type === 'boxEnd') placeBoxEnd(cursor);
     });
+    placeBoxEnd(cursor);   // 閉じ忘れの枠は最後で閉じる
     // 最後のページが空（ちょうど前のページで終わった）なら捨てる
     if (cursor.pages.length > 1 && !cursor.page.items.length) cursor.pages.pop();
     addPageFrames(cursor.pages, header, measure);

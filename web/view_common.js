@@ -4,8 +4,11 @@
 //   値は必ず textContent で書く（鑑定文や応答の文字を HTML として解釈させない）
 //   項目（開閉の単位）：{ key, title, closable, className, parts: [部品] }。画面・PDF・画像・印刷・自分用の文章が同じ項目を読む
 //   部品：{ type: 'table', headers, rows, className } ／ { type: 'lines', text, className } ／
-//         { type: 'heading', level, text, className } ／ { type: 'chart', title, points, color }
-//   文の部品に editKey・editLabel があれば書き直せる（段階3b。text_edit.js）
+//         { type: 'heading', level, text, className } ／ { type: 'chart', title, points, color, markIndex, markLabel } ／
+//         { type: 'figure', kind, title, data }（鑑定書の図。view_figure.js） ／
+  //         { type: 'boxStart', className, tone, color } … { type: 'boxEnd' }（その間の部品を薄い色の枠で囲む。入れ子にしない）
+//   文の部品に editKey・editLabel があれば書き直せる（段階3b。text_edit.js）。isExtra なら鑑定書の字数に数えない。
+//   tone（'tip'・'lead'）は PDF の字の形
 // 書き方の決まり：web/README.md
 // ============================================================
 (function () {
@@ -64,10 +67,21 @@
     return table;
   }
 
-  /** 改行を含む文を段落に分けて parent に足す。 */
+  var TERM_CLASS = 'has-terms';   // 各行の「：」の前（用語）を太字にする段落（用語ミニ辞典。段階3）
+  var TERM_SEPARATOR = '：';
+
+  /** 改行を含む文を段落に分けて parent に足す。className に has-terms があれば、各行の「：」の前を太字にする。 */
   function appendLines(parent, text, className) {
     var lines = String(text).split('\n');
-    for (var i = 0; i < lines.length; i++) parent.appendChild(createElement('p', className || 'result-text', lines[i]));
+    var hasTerms = (' ' + (className || '') + ' ').indexOf(' ' + TERM_CLASS + ' ') >= 0;
+    for (var i = 0; i < lines.length; i++) {
+      var at = hasTerms ? lines[i].indexOf(TERM_SEPARATOR) : -1;
+      if (at <= 0) { parent.appendChild(createElement('p', className || 'result-text', lines[i])); continue; }
+      var p = createElement('p', className);
+      p.appendChild(createElement('strong', 'term', lines[i].slice(0, at)));
+      p.appendChild(document.createTextNode(lines[i].slice(at)));
+      parent.appendChild(p);
+    }
   }
 
   /**
@@ -157,7 +171,9 @@
     } else if (part.type === 'heading') {
       parent.appendChild(createElement('h' + part.level, part.className, part.text));
     } else if (part.type === 'chart') {
-      VIEW.appendLineChart(parent, part.title, part.points, part.color);
+      VIEW.appendLineChart(parent, part.title, part.points, part.color, part.markIndex, part.markLabel);
+    } else if (part.type === 'figure') {
+      VIEW.appendFigure(parent, part);   // 鑑定書の図（view_figure.js）
     }
   }
 
@@ -168,6 +184,9 @@
   function renderSection(container, section) {
     var element = appendSection(container, section.title);
     if (section.className) element.className += ' ' + section.className;
+    // 章のアイコン（段階3）は見出しの字の前に置く（字は textContent のまま）
+    var icon = section.icon ? VIEW.buildIconSvg(section.icon) : null;
+    if (icon) element.firstChild.insertBefore(icon, element.firstChild.firstChild);
     element.setAttribute('data-section-key', section.key);
     if (section.closable) {
       var toggle = createElement('button', 'section-toggle');
@@ -176,7 +195,19 @@
       element.appendChild(toggle);
       writeToggleState(element, toggle, false);
     }
-    section.parts.forEach(function (part) { renderPart(element, part); });
+    // 部品 boxStart〜boxEnd の間は、枠（div）の中に書く（鑑定書の「鑑定の根拠」。入れ子にはしない）
+    var parent = element;
+    section.parts.forEach(function (part) {
+      if (part.type === 'boxStart') {
+        parent = createElement('div', 'result-box' + (part.className ? ' ' + part.className : ''));
+        if (part.color) parent.style.setProperty('--box-color', part.color);   // 枠の線の色（要の一文の枠は章の色）
+        element.appendChild(parent);
+      } else if (part.type === 'boxEnd') {
+        parent = element;
+      } else {
+        renderPart(parent, part);
+      }
+    });
     return element;
   }
 

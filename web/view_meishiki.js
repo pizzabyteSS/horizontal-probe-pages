@@ -14,7 +14,7 @@
     ZOKAN: 8, ZOKAN_TSUHEN: 14,
     KUUBOU: 20, ISHIKI: 21, GOSHUGOSIN: 28,
     STAR_START: 325, STAR_COUNT: 4,
-    BALANCE_START: 238,
+    BALANCE_START: 238, STRENGTH: 280,   // 身強弱（B＝点数・C＝5段階のラベル。api_master.js の _convertResultToDataRows_）
     NIKKAN_LEFT_START: 393, NIKKAN_LEFT_COUNT: 12, NIKKAN_SUMMARY_START: 406,
     TSUHEN_DIST_START: 309, YOJIN_MATRIX_START: 364, YOJIN: 321, KIJIN: 322,
     TAIUN_DIR: 380, TAIUN_AGE: 381,
@@ -23,6 +23,7 @@
     GETSUUN_HEADER: 172, GETSUUN_START: 173, GETSUUN_COUNT: 12
   };
   var PILLAR_HEADERS = ['', '年柱', '月柱', '日柱', '時柱'];
+  var DAY_PILLAR_INDEX = 2;   // 年柱・月柱・日柱・時柱のうち日柱
   var GOGYO_NAMES = ['木', '火', '土', '金', '水'];                                   // writeS02Sheet_ の gogyoNames
   var TSUHEN_NAMES = ['比肩', '劫財', '食神', '傷官', '偏財', '正財', '偏官', '正官', '偏印', '印綬'];   // 同 tsuhenNames
   var ISHIKI_NONE = '該当なし';
@@ -146,7 +147,7 @@
     var rows = block.map(function (values, i) {
       return [i < TSUHEN_NAMES.length ? TSUHEN_NAMES[i] : '合計'].concat(values.map(VIEW.formatOrEmpty));
     });
-    return createSection('tsuhen', '通変星分布', [tablePart(['', '天干', '蔵干（本気）', '合計'], rows)]);
+    return createSection('tsuhen', '通変星分布', [tablePart(['', '天干', '蔵干', '合計'], rows)]);
   }
 
   // 用神（GSS 版 C71:E75 のマトリクスは空のまま出す。E76・E77 の用神・喜神は「-」付き）
@@ -202,6 +203,35 @@
     return createSection('getsuun', '月運（12か月）', [tablePart(readHeaders(table, ROW.GETSUUN_HEADER, 1, 10), rows, 'is-wide')]);
   }
 
+  // ---- 鑑定書の図の値（段階2：鑑定書のわかりやすさ。view_figure.js が描く） ----
+  /** 命式の4本の柱：年柱〜時柱の天干・地支・通変星・十二運（表と同じ行。日柱は強調する）。 */
+  function readPillarFigureData(table) {
+    var stems = readPillarCells(table, ROW.STEM);
+    var branches = readPillarCells(table, ROW.BRANCH);
+    var tsuhens = readPillarCells(table, ROW.TSUHEN);
+    var juniuns = readPillarCells(table, ROW.JUNIUN);
+    return PILLAR_HEADERS.slice(1).map(function (label, i) {
+      return { label: label, stem: stems[i], branch: branches[i], tsuhen: tsuhens[i], juniun: juniuns[i], isDay: i === DAY_PILLAR_INDEX };
+    });
+  }
+
+  /** 五行の数（B列＝天干・地支の合計。命式詳細の「合計」と同じ）：{ 木: 数, … }。 */
+  function readGogyoCounts(table) {
+    var counts = {};
+    table.getBlock(ROW.BALANCE_START, 2, GOGYO_NAMES.length, 1).forEach(function (values, i) {
+      counts[GOGYO_NAMES[i]] = Number(values[0]) || 0;
+    });
+    return counts;
+  }
+
+  /** 身強弱：{ score：点数の文字（空なら ''）, label：'強い'など（空なら ''） }。 */
+  function readStrength(table) {
+    return { score: VIEW.formatOrEmpty(table.get(ROW.STRENGTH, 2)), label: VIEW.formatOrEmpty(table.get(ROW.STRENGTH, 3)) };
+  }
+
+  VIEW.readPillarFigureData = readPillarFigureData;
+  VIEW.readGogyoCounts = readGogyoCounts;
+  VIEW.readStrength = readStrength;
   VIEW.buildMeishikiSections = buildMeishikiSections;
   VIEW.renderMeishiki = renderMeishiki;
 })();

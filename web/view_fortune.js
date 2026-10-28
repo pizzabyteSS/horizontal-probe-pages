@@ -73,13 +73,8 @@
   function buildNenun(table) {
     var spec = FORTUNE.nenun;
     var result = { rows: [], breakdown: [], points: [] };
-    var all = table.getBlock(spec.startRow, 1, spec.rowCount, COLUMN_COUNT);
-    var startYear = parseInt(VIEW.toIntText(table.get(START_DATE_ROW, 2)), 10);
-    var found = 0;
-    for (var i = 0; i < all.length; i++) {
-      var match = String(all[i][0] || '').match(/^(\d{4})/);
-      if (match && parseInt(match[1], 10) === startYear) { found = i; break; }
-    }
+    var all = readNenunBlock(table);
+    var found = findStartYearIndex(table, all);
     for (var j = 0; j < spec.displayCount && found + j < all.length; j++) {
       var values = all[found + j];
       if (!VIEW.hasAnyValue(values)) continue;
@@ -94,6 +89,32 @@
       pushChartPoint(result.points, year, score);
     }
     return result;
+  }
+
+  function readNenunBlock(table) {
+    return table.getBlock(FORTUNE.nenun.startRow, 1, FORTUNE.nenun.rowCount, COLUMN_COUNT);
+  }
+
+  /** 年運表の行のうち、A列の先頭4桁が鑑定開始年（39行 B）と一致する行の添字（見つからなければ 0＝先頭）。 */
+  function findStartYearIndex(table, all) {
+    var startYear = parseInt(VIEW.toIntText(table.get(START_DATE_ROW, 2)), 10);
+    for (var i = 0; i < all.length; i++) {
+      var match = String(all[i][0] || '').match(/^(\d{4})/);
+      if (match && parseInt(match[1], 10) === startYear) return i;
+    }
+    return 0;
+  }
+
+  /**
+   * 鑑定開始年の年運（鑑定書の「ひと目でわかるあなた」の今年の運気。年運表の1行目と同じ行）。
+   * 返す値：{ year：'2026' など（読めなければ ''）, score：運気の点数（空なら ''） }
+   */
+  function readStartYearFortune(table) {
+    var all = readNenunBlock(table);
+    var values = all[findStartYearIndex(table, all)] || [];
+    var yearMatch = String(values[0] || '').match(/^(\d{4})/);
+    var score = values[FORTUNE.nenun.scoreCol];
+    return { year: yearMatch ? yearMatch[1] : '', score: VIEW.isBlank(score) ? '' : String(score) };
   }
 
   /** 月運表：173〜184行 A:P。空の行は飛ばす。A列「2026年10月」は文字のまま出す（§5 の 4）。 */
@@ -159,8 +180,66 @@
     VIEW.renderSections(container, [VIEW.buildInfoSection(VIEW.readCommonInfo(table, name)), buildFortuneSection(table, kind)]);
   }
 
+  // ---- 鑑定書の図の値（段階2：鑑定書のわかりやすさ。第7章） ----
+  var NENUN_TREND_BEFORE = 2;    // 年運の折れ線：今年の前の年をいくつ載せるか（今年の位置が分かるように）
+  var NENUN_TREND_COUNT = 12;    // 年運の折れ線の年の数（年運表と同じ12年）
+
+  /** 鑑定開始年の年齢（年運の A列「2026（41歳）」の41。読めなければ null）。 */
+  function readStartAge(table) {
+    var all = readNenunBlock(table);
+    var match = String((all[findStartYearIndex(table, all)] || [])[0] || '').match(/（(\d+)歳）/);
+    return match ? parseInt(match[1], 10) : null;
+  }
+
+  /**
+   * 年運の折れ線：今年の NENUN_TREND_BEFORE 年前から NENUN_TREND_COUNT 年。返す値：{ points: [{ label, value }], markIndex：今年の点（なければ -1） }。
+   * 点にするのは年運表のグラフと同じ（見出しが空でなく、運気が数値の行）
+   */
+  function readNenunTrend(table) {
+    var all = readNenunBlock(table);
+    var found = findStartYearIndex(table, all);
+    var from = Math.max(0, found - NENUN_TREND_BEFORE);
+    var points = [];
+    var markIndex = -1;
+    for (var i = from; i < all.length && i < from + NENUN_TREND_COUNT; i++) {
+      var yearMatch = String(all[i][0] || '').match(/^(\d{4})/);
+      if (!yearMatch) continue;
+      var before = points.length;
+      pushChartPoint(points, yearMatch[1], VIEW.formatOrDash(all[i][FORTUNE.nenun.scoreCol]));
+      if (i === found && points.length > before) markIndex = before;   // 今年の運気が数値でなければ印を付けない
+    }
+    return { points: points, markIndex: markIndex };
+  }
+
+  /**
+   * 大運の帯：大運表の行（立運前＋大運10）。返す値：[{ startLabel：'18歳'など, score：運気の点数（数値でなければ ''）, isCurrent }]。
+   * いまの10年は、年齢帯 B列「18〜27歳」に鑑定開始年の年齢が入る行
+   */
+  function readTaiunBands(table) {
+    var spec = FORTUNE.taiun;
+    var age = readStartAge(table);
+    var bands = [];
+    table.getBlock(spec.startRow, 1, spec.rowCount, COLUMN_COUNT).forEach(function (values) {
+      if (!VIEW.hasAnyValue(values)) return;
+      var range = String(values[1] || '').match(/^(\d+)〜(\d+)歳/);
+      if (!range) return;
+      var from = parseInt(range[1], 10);
+      var to = parseInt(range[2], 10);
+      var score = values[spec.scoreCol];
+      bands.push({
+        startLabel: from + '歳', score: VIEW.isBlank(score) || isNaN(Number(score)) ? '' : String(score),
+        isCurrent: age !== null && age >= from && age <= to
+      });
+    });
+    return bands;
+  }
+
+  VIEW.readNenunTrend = readNenunTrend;
+  VIEW.readTaiunBands = readTaiunBands;
+  VIEW.FORTUNE_COLOR_NENUN = FORTUNE.nenun.color;
   VIEW.FORTUNE_KINDS = ['taiun', 'nenun', 'getsuun', 'nichiun'];
   VIEW.buildFortuneSection = buildFortuneSection;
+  VIEW.readStartYearFortune = readStartYearFortune;
   VIEW.renderFortune = renderFortune;
   VIEW.formatDayLabel = formatDayLabel;
 })();

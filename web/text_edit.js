@@ -1,7 +1,9 @@
 // ============================================================
 // web/src/text_edit.js — 鑑定文の書き直し（段階3b）
 // 設計：docs/product-spec.md §4.1 の 2（書き直す・原文を見る・原文に戻す）・§4.2（書き直した文も作業中の鑑定に残す）
-//   書き直せるのは、項目の部品のうち editKey の付いた文（鑑定書の「あなたの傾向」と鑑定結果の本文。view_report.js）だけ
+//   書き直せるのは、項目の部品のうち editKey の付いた文（鑑定書の「あなたの傾向」・鑑定結果の本文・Web 版だけの文
+//     （ひと目でわかるあなた・豆知識・用語ミニ辞典）・本文の再掲（今日からできること）。view_report.js）だけ
+//   同じ editKey の文は同じ1つの文（再掲）。どこで書き直しても、すべての所に当てる
 //   項目の一覧（view_result.js の buildResultModel）は原文のまま変えない。書き直しは { editKey: { label, text } } で別に持ち、
 //     画面・PDF・画像・印刷・自分用の文章を作るときに当てる（applyTextEdits）。原文の要約値（work_draft.js）は原文から作る
 //   原文は同じ入力から毎回作り直せるため、端末に残すのは書き直した文だけ（label は、原文を作り直せないときに
@@ -46,7 +48,10 @@
     model.groups.forEach(function (group) {
       group.sections.forEach(function (section) {
         section.parts.forEach(function (part) {
-          if (part.editKey) out[part.editKey] = { label: String(part.editLabel || ''), text: String(part.text) };
+          if (!part.editKey) return;
+          // 同じ文が2か所にあるときは、本文の側（isExtra でない）の名前を使う（自分用の文章で「第1章｜…」と出すため）
+          if (hasOwn(out, part.editKey) && part.isExtra) return;
+          out[part.editKey] = { label: String(part.editLabel || ''), text: String(part.text) };
         });
       });
     });
@@ -79,6 +84,8 @@
         if (String(section.key).indexOf(REPORT_SECTION_PREFIX) !== 0) return;
         var isOpen = !section.closable || !closed[section.key];
         section.parts.forEach(function (part) {
+          // Web 版だけの文（豆知識・用語ミニ辞典など）と本文の再掲（一言・今日からできること）は数えない（2026-10-27 ガクさん）
+          if (part.isExtra) return;
           var field = part.type === 'table' ? 'items' : part.editKey ? 'body' : '';
           if (!field) return;
           var n = field === 'items' ? countTableValueChars(part.rows) : countBodyChars(part.text);
@@ -249,6 +256,22 @@
     window.setTimeout(function () { if (flash.textContent === shown) flash.textContent = ''; }, 4000);
   }
 
+  /**
+   * root の中で key の文（同じ文が2か所にあることがある：一言＝第1章のあなたの傾向、今日からできること＝本文）の表示を、
+   * すべて書き直しに合わせる。開いているほかの入力欄にも、いまの文を入れる（古い文のまま書くと、先の書き直しを消してしまうため。
+   * Codex P2）。activeInput（いま書いている入力欄）の中身は変えない（書いている途中の文を消さないため）
+   */
+  function renderBlocksOfKey(root, key, edits, originals, activeInput) {
+    var text = hasOwn(edits, key) ? edits[key].text : originals[key].text;
+    var blocks = root.querySelectorAll('.edit-block');
+    for (var i = 0; i < blocks.length; i++) {
+      if (blocks[i].getAttribute('data-edit-key') !== key) continue;
+      renderEditBlock(blocks[i], edits, originals);
+      var input = findChild(blocks[i], 'edit-input');
+      if (input !== activeInput && !input.hidden) input.value = text;
+    }
+  }
+
   /** root の中の書き直せる文すべてに、書き直しを当てる（鑑定を書いたあと・続きからのあとに呼ぶ）。 */
   function applyTextEditsToDom(root, edits, originals) {
     var blocks = root.querySelectorAll('.edit-block');
@@ -294,8 +317,7 @@
           // 確かめている間に別の鑑定に替わっていたら何もしない（その画面の書き直し・原文で確かめ直す）
           if (!isOk || deps.getEdits() !== edits || !block.isConnected) return;
           if (!writeTextEdit(edits, originals, key, originals[key].text)) return;
-          if (!findChild(block, 'edit-input').hidden) findChild(block, 'edit-input').value = originals[key].text;
-          renderEditBlock(block, edits, originals);
+          renderBlocksOfKey(root, key, edits, originals, null);   // 開いている入力欄はすべて原文にする
           flashNote(block, REVERTED_NOTE);
           deps.onChanged();
         });
@@ -307,8 +329,9 @@
       var block = input.closest('.edit-block');
       var edits = deps.getEdits();
       var originals = deps.getOriginals();
-      if (!writeTextEdit(edits, originals, block.getAttribute('data-edit-key'), input.value)) return;
-      renderEditBlock(block, edits, originals);
+      var key = block.getAttribute('data-edit-key');
+      if (!writeTextEdit(edits, originals, key, input.value)) return;
+      renderBlocksOfKey(root, key, edits, originals, input);
       deps.onChanged();
     });
   }

@@ -112,7 +112,7 @@ html[data-brand-color] .app-bar-title, html[data-brand-color] .app-bar-back, htm
 /* 鑑定書の最後の字数（印刷・納品物にも載せる。送る分だけ） */
 .report-count-end { margin: 24px 0 0; padding-top: 8px; border-top: 1px solid var(--color-paper-line); text-align: right; font-family: var(--font-report); font-size: 14px; color: var(--color-sub); font-variant-numeric: tabular-nums; word-break: keep-all; overflow-wrap: anywhere; }
 .report-count-end:empty { display: none; }
-.zone-report .report-chapter > .result-block-title { font-family: var(--font-report); font-size: 18px; border-left: 0; padding: 0 0 4px; border-bottom: 1px solid var(--color-paper-line); }
+.zone-report .report-chapter > .result-block-title, .zone-report .report-extra > .result-block-title { font-family: var(--font-report); font-size: 18px; border-left: 0; padding: 0 0 4px; border-bottom: 1px solid var(--color-paper-line); }
 .zone-report .report-text, .zone-report .edit-current p { font-family: var(--font-report); font-size: 16px; line-height: 1.9; }
 .zone-report .report-subheading { font-family: var(--font-report); font-size: 15px; }
 .zone-report .result-table th, .zone-report .result-table td { border-color: var(--color-paper-line); }
@@ -136,10 +136,20 @@ html[data-brand-color] #outReport .result-block:not(.is-closed) > .result-block-
 .result-table.is-fortune td:last-child { white-space: normal; min-width: 12em; text-align: left; }
 .result-table.is-report td { white-space: pre-wrap; text-align: left; }
 .result-table.is-report td:last-child { min-width: 12em; }
-.report-chapter { margin-top: 20px; }
+.report-chapter, .report-extra { margin-top: 20px; }
 .report-heading { font-size: 14px; margin: 10px 0 4px; color: var(--color-sub); }
 .report-subheading { font-size: 14px; margin: 8px 0 2px; }
 .report-text { line-height: 1.7; }
+/* 鑑定書のわかりやすさ（段階1。2026-10-27）：根拠の枠・豆知識・ひと目でわかるあなたのキーワード */
+.result-box.report-basis { margin: 14px 0 6px; padding: 4px 12px 2px; background: #f4f6f8; border: 1px solid var(--color-paper-line); border-radius: 6px; }
+.result-box.report-basis .result-table td { background: #fff; }
+/* 段階3：章のアイコン（見出しの字の前）・要の一文の枠（左に章の色の線）・用語ミニ辞典の用語の太字 */
+.section-icon { width: 1.25em; height: 1.25em; margin-right: 0.35em; vertical-align: -0.22em; flex: none; }
+.result-box.report-key { margin: 10px 0 8px; padding: 2px 12px 4px; background: #fafbfc; border: 1px solid var(--color-paper-line); border-left: 5px solid var(--box-color, var(--color-line)); border-radius: 4px; }
+.result-text .term { font-weight: bold; }
+.zone-report .report-tip, .zone-report .report-tip .edit-current p, .zone-report .edit-current p.report-tip { font-size: 13px; line-height: 1.7; color: var(--color-sub); }
+.zone-report .edit-current p.report-keywords { font-size: 20px; font-weight: bold; letter-spacing: 0.05em; }
+.zone-report .report-glance > .result-block-title { color: var(--color-brand, var(--color-text)); }
 /* 折れ線グラフ（縦軸 0〜100）。点が多いときは枠の中で横に動かす */
 .chart { margin: 4px 0 8px; }
 .chart-title { font-size: 14px; margin: 0 0 2px; }
@@ -148,6 +158,12 @@ html[data-brand-color] #outReport .result-block:not(.is-closed) > .result-block-
 .chart-grid { stroke: var(--color-line); stroke-width: 1; }
 .chart-axis { fill: var(--color-sub); font-size: 11px; }
 .chart-line { fill: none; stroke-width: 2; }
+.chart-mark { stroke-width: 2; stroke-dasharray: 4 3; }
+.chart-mark-label { font-size: 11px; font-weight: bold; }
+/* 鑑定書の図（view_figure.js）。幅いっぱいに広げ、広い画面では大きくなりすぎない */
+.figure { margin: 6px 0 10px; max-width: 480px; }
+.figure svg { display: block; width: 100%; height: auto; }
+.figure-text { font-family: -apple-system, "Hiragino Sans", "Noto Sans JP", sans-serif; }
 /* 項目の開閉（段階3a-2）。閉じた項目は見出しとボタンだけを出す（送る・印刷に載せない） */
 .section-toggle { font-size: 13px; padding: 3px 10px; margin: 0 0 4px; border: 1px solid var(--color-line); border-radius: 6px; background: #fff; color: var(--color-accent); }
 /* 閉じた項目は色の枠で示す（中身は隠す。2026-10-21） */
@@ -232,13 +248,13 @@ html[data-brand-color] #outReport .result-block:not(.is-closed) > .result-block-
   .fortune-group:has(.result-group-title.is-all-closed) { display: none; }
   .result-table { font-size: 11pt; width: 100%; }
   .result-table th, .result-table td { white-space: normal; padding: 3px 5px; }
-  .result-table thead th { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .result-table thead th, .result-box, .section-icon { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .edit-note, .edit-controls, .edit-original, .edit-input, .edit-empty { display: none !important; }    /* 書き直した後の文だけを出す（空にした文の知らせも出さない） */
   .edit-block.is-editing > .edit-current { display: block; }
   .edit-block.is-edited > .edit-current { border-left: 0; padding-left: 0; }
   .zone-title { margin-top: 0; }
   .table-wrap { overflow: visible; }
-  .result-table tr, .chart, .result-block-title { break-inside: avoid; }
+  .result-table tr, .chart, .figure, .result-block-title { break-inside: avoid; }
   .result-block-title { break-after: avoid; }
   .brand-bar { break-after: avoid; }
   .print-only:not([hidden]) { display: block; }
