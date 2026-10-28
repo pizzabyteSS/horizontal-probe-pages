@@ -41,7 +41,7 @@
   };
   var LABEL_RHYTHM = { STABLE: '安定型', UNSTABLE: '波が出やすい', ACTIVE: '活動型', STORE: '蓄積型', ADJUST: '調整型' };
   var LABEL_ISOHOU = {
-    NONE: 'なし', TENCHU: '天剋地冲', TENKAN_CHONG: '天干冲', SHIGOU: '支合', SANGO: '三合',
+    NONE: 'なし', TENCHU: '天剋地冲', TENKAN_CHONG: '天干冲', SHIGOU: '支合', SANGO: '三合・半会',
     RIKUGO: '六合', CHONG: '冲', GAI: '害', KEI: '刑', HA: '破'
   };
   var LABEL_KUUBOU = { NEUSHI: '子丑', TORAU: '寅卯', TATSUMI: '辰巳', UMAHITSUJI: '午未', SARUTORI: '申酉', INUI: '戌亥' };
@@ -116,7 +116,7 @@
     },
     {
       title: '第7章｜運勢の流れ', summaryKey: 'KANTEI_SUMMARY_CH7', icon: { name: 'trend', color: '#5b5fb8' },
-      figures: ['decade', 'nenun'],
+      figures: ['decade', 'nenun'], markLegend: true,
       tip: '大運＝10年ごとの運気の流れ。年運＝1年ごとの運気。位相法＝その年の干支と命式の組み合わせ、空亡＝運気が空回りしやすい時期の目印です。',
       // 大運・年運の総合ラベルの意味は運表の解説（KANTEI_REPORT_CH7_* の B列＝period summary の text1。output_report.js の E123・E124）
       mainItems: [['大運総合ラベル', 'DECADE_SUMMARY_LABEL', 'KANTEI_REPORT_CH7_DECADE'], ['年運総合ラベル', 'YEAR_SUMMARY_LABEL', 'KANTEI_REPORT_CH7_YEAR']],
@@ -167,7 +167,7 @@
   // ---- Web 版だけの部品（段階1：鑑定書のわかりやすさ。設計 claude/DESIGN_2026-10-27_report-readability.md） ----
   // 文はすべて鑑定文と同じく書き直せる（editKey。2026-10-27 ガクさん）。Web 版の文のキーは WEB_ で始める（_data のキーと重ねない）
   // 「本鑑定書の文字数」には数えない（isExtra。豆知識・用語ミニ辞典・ひと目でわかるあなた・今日からできること。2026-10-27 ガクさん）
-  // 本文を再び載せる所（一言・今日からできること）は、本文と同じキーにする（どちらで書き直しても両方が同じ文になる）
+  // 本文を再び載せる所（一言）は、本文と同じキーにする（どちらで書き直しても両方が同じ文になる）。今日からできることは1文目だけで別のキー
   var GLANCE = {
     key: 'report.glance', title: 'ひと目でわかるあなた',
     // キーワード3つ：日干・日干強弱・月柱の天干の通変星（案A。オーソドックスで正確な組み合わせ。2026-10-27 ガクさん）
@@ -220,14 +220,87 @@
     ]
   };
   var GLOSSARY_GROUP_MARK = '■ ';   // 見出しの行（「：」がないので太字にならない）
-  // 最後のページ「今日からできること」：本文の再掲（[題名, 本文のキー]。キーは CHAPTERS の reports と同じ）
+  // 用語ミニ辞典の最後のまとまり：この鑑定書（命式・運勢表）に出た特殊星だけを1行ずつ（2026-10-28 ガクさん承認）。
+  //   名前が怖く聞こえる星があるため、前置きの1行を付ける。意味は master_gss/star_table_data.js の備考を、読む人向けに和らげた言い方
+  var STAR_GROUP_TITLE = 'この鑑定書に出てくる特殊星';
+  var STAR_GROUP_LEAD = '名前が強く聞こえる星もありますが、凶の意味とは限りません。ほかの星との組み合わせで働き方が変わる目印です。';
+  var STAR_NOTES = [
+    ['桃花殺', '人を惹きつける魅力。異性との縁が生まれやすい'], ['三貴人', '天干に貴人の組み合わせがそろう。大きな引き立てを受けやすい'],
+    ['天乙貴人', '最高の吉星とされる。困ったときに助けが入りやすい'], ['福星貴人', '生涯を通じて福に恵まれやすい'],
+    ['天官貴人', '名誉や地位、役職での成功に縁がある'], ['天厨貴人', '衣食住に困りにくい'],
+    ['文昌貴人', '学問・芸術・文章の才能'], ['十干禄', '着実に発展し、経済的に安定しやすい'],
+    ['金与禄', '良縁や家庭の安定、資産に恵まれやすい'], ['暗禄', '目立たないところからの支援や、思わぬ幸運'],
+    ['羊刃', '意志がとても強い。良くも悪くも結果がはっきり出やすい'], ['飛刃', '気の短さや出費に注意。吉星と重なると突破力になる'],
+    ['紅艶殺', '愛嬌と色気。人を惹きつける魅力'], ['流霞殺', '気持ちに流されやすい。人間関係では落ち着いた判断を'],
+    ['魁罡', '強い個性と、大きな成功をつかむ力'], ['日徳', '穏やかで徳があり、福に恵まれやすい'],
+    ['禄馬貴人', '動くほど収入や機会につながりやすい'], ['日刃', '気性が強く、行動力がある'],
+    ['陰差', '人との縁で行き違いが起きやすい。確認を丁寧に（女性に見る星）'],
+    ['陽差', '人との縁で行き違いが起きやすい。確認を丁寧に（男性に見る星）'],
+    ['妨害殺', '物事が思うように進みにくいことがある。慎重に進めると吉'], ['淫欲殺', '情愛が深い'],
+    ['日座中殺', '日柱にかかる中殺。足元が揺らぎやすいので、生活の土台を大切に'],
+    ['日居中殺', '日柱にかかる中殺。家庭やパートナーとの縁を丁寧に育てたい'],
+    ['日貴', '品があり、目上から引き立てを受けやすい'], ['天徳貴人', '災いを避ける守りの星'],
+    ['月徳貴人', '協力者に恵まれやすい守りの星'], ['天徳合', '天徳貴人の働きを補い、強める'], ['月徳合', '月徳貴人の働きを補い、強める'],
+    ['華蓋', 'ひとりで考える力。芸術や精神的なものへの才能'], ['咸池', '恋愛や社交で華やかさが出やすい'],
+    ['駅馬', '移動が多く、活動の範囲が広がりやすい'], ['劫殺', '外からの急な変化や刺激が入りやすい。備えがあれば転機になる'],
+    ['亡神', '考えすぎや焦りが出やすい。休む時間を大切に'], ['白虎', '焦りから物事が荒れやすい。落ち着いて進めると吉'],
+    ['血刃', '日常の油断によるミスや、体調管理に気をつけたい'], ['隔角', '身内や家庭との距離感を大切に'],
+    ['孤辰', 'ひとりの時間を必要とする傾向（男性に強く出やすい）'], ['寡宿', 'ひとりで抱え込みやすい傾向（女性に強く出やすい）'],
+    ['囚獄', '契約・約束・締め切りなどの決まりごとに気をつけたい'], ['黄旛', '責任感の強さが、頑固さに見えやすい'],
+    ['弔客', '共感する力が強いぶん、気疲れしやすい'], ['死符', '区切りをつけて手放し、新しくする好機'],
+    ['病符', '疲れやすさに注意。ペース配分を大切に']
+  ];
+  var STAR_SPLIT = /[・、,\/\s]+/;
+  var MEISHIKI_STAR_ROW = 325;   // 命式の特殊星（325〜328行。星の名前は A列、柱ごとの印は B〜E列。view_meishiki.js の STAR_START）
+  var MEISHIKI_STAR_COUNT = 4;
+  // 最後のページ「今日からできること」：本文の1文目だけを短く載せる（全文の再掲だったため。2026-10-28 ガクさん承認）。
+  //   [題名, 本文のキー]。キーは CHAPTERS の reports と同じ。書き直しは本文とは別の文（WEB_TODAY_ ＋ 本文のキー）
   var TODAY = {
-    key: 'report.today', title: '今日からできること',
+    key: 'report.today', title: '今日からできること', editKeyPrefix: 'WEB_TODAY_',
     items: [
       ['才能を活かす鍵', 'KANTEI_REPORT_CH1_TALENT'], ['開運のヒント', 'KANTEI_REPORT_CH8_KAIUN'],
       ['天中殺の過ごし方', 'KANTEI_REPORT_CH8_TENCHU'], ['エネルギーを整える習慣', 'KANTEI_REPORT_CH8_ENERGY']
     ]
   };
+  // 第8章「天中殺の過ごし方」の本文の前に置く、計算で出す1行（書き直さない・字数に数えない。2026-10-28 ガクさん承認）。
+  //   空亡の2支（KUUBOU_TYPE_KEY）と鑑定開始年から、今が天中殺か・次はいつかを書く。年の区切りは立春（四柱推命の年）
+  var TENCHU_REPORT_KEY = 'KANTEI_REPORT_CH8_TENCHU';
+  var KUUBOU_BRANCHES = { NEUSHI: [0, 1], TORAU: [2, 3], TATSUMI: [4, 5], UMAHITSUJI: [6, 7], SARUTORI: [8, 9], INUI: [10, 11] };
+  var BRANCH_CHARS = '子丑寅卯辰巳午未申酉戌亥';
+
+  /** 西暦の年の地支（0＝子。2020年＝子）。 */
+  function branchOfYear(year) { return ((year - 4) % 12 + 12) % 12; }
+
+  /** 天中殺の年の1行（空亡か年が読めなければ ''）。 */
+  function buildTenchuYearText(kuubouKey, startYear) {
+    var pair = Object.prototype.hasOwnProperty.call(KUUBOU_BRANCHES, kuubouKey) ? KUUBOU_BRANCHES[kuubouKey] : null;
+    var year = parseInt(startYear, 10);
+    if (!pair || isNaN(year)) return '';
+    var head = 'あなたの天中殺は' + BRANCH_CHARS.charAt(pair[0]) + '年・' + BRANCH_CHARS.charAt(pair[1]) + '年です（年の区切りは立春）。';
+    var branch = branchOfYear(year);
+    if (branch === pair[0]) return head + '今年（' + year + '年）から' + (year + 1) + '年までの2年間がその時期にあたります。';
+    if (branch === pair[1]) return head + '今年（' + year + '年）は天中殺の2年目にあたります。';
+    var first = year + (pair[0] - branch + 12) % 12;
+    return head + '次は' + first + '〜' + (first + 1) + '年で、今年（' + year + '年）は該当しません。';
+  }
+
+  /** 文の1文目（「。」まで。なければ全文）。 */
+  function firstSentence(text) {
+    var match = String(text || '').match(/^[^。]*。/);
+    return match ? match[0] : String(text || '');
+  }
+
+  /** 命式と運勢表（画面に出る行）に出た特殊星の [名前, 意味]（STAR_NOTES の順）。 */
+  function collectStarNotes(table) {
+    var found = {};
+    var cells = [];
+    table.getBlock(MEISHIKI_STAR_ROW, 1, MEISHIKI_STAR_COUNT, 5).forEach(function (row) { cells = cells.concat(row); });
+    cells = cells.concat(VIEW.listFortuneCells(table));
+    cells.forEach(function (cell) {
+      String(cell === null || cell === undefined ? '' : cell).split(STAR_SPLIT).forEach(function (token) { if (token) found[token] = true; });
+    });
+    return STAR_NOTES.filter(function (note) { return found[note[0]]; });
+  }
 
   /** 空・null・'null'・'undefined' は空文字、そうでなければ文字にする（GSS 版の safe_）。 */
   function formatReportValue(value) {
@@ -259,9 +332,10 @@
   /** 鑑定書の中身（画面に書く前の形）。試験と段階3 の PDF でも同じものを使えるように分けておく。 */
   function buildReport(table) {
     var keyMap = table.buildKeyMap();
+    var tenchuYear = buildTenchuYearText(readKeyValue(keyMap, 'KUUBOU_TYPE_KEY'), VIEW.readStartYearFortune(table).year);
     return CHAPTERS.map(function (chapter) {
       return {
-        title: chapter.title,
+        title: chapter.title, tenchuYear: tenchuYear,
         summary: readKeyValue(keyMap, chapter.summaryKey),
         tip: chapter.tip,
         figures: buildChapterFigures(table, chapter),
@@ -318,6 +392,9 @@
     ];
     chapter.reports.forEach(function (report, i) {
       parts.push(buildHeading(5, report.title));
+      if (source.reports[i][1] === TENCHU_REPORT_KEY && chapter.tenchuYear) {
+        parts.push({ type: 'lines', text: chapter.tenchuYear, className: 'result-text report-text report-tenchu-year' });
+      }
       parts.push(buildEditableLines(report.text, source.reports[i][1], chapter.title + '／' + report.title));
     });
     parts.push({ type: 'boxStart', className: 'report-basis' });
@@ -325,6 +402,7 @@
     parts.push(buildEditableLines(chapter.tip, TIP_EDIT_KEY_PREFIX + (index + 1), chapter.title + '／豆知識',
       { isExtra: true, tone: 'tip', className: 'report-tip' }));
     chapter.figures.forEach(function (figure) { parts.push(figure); });
+    if (source.markLegend) parts.push(buildTipLine(VIEW.SUMMARY_MARK_LEGEND));   // 総合ラベルの ◎○△注 の決まり
     parts.push({ type: 'table', headers: ['主項目', '診断結果', '意味'], rows: chapter.mainRows, className: 'is-report' });
     parts.push({ type: 'table', headers: ['副項目', '診断結果', '意味'], rows: chapter.subRows, className: 'is-report' });
     parts.push({ type: 'boxEnd' });
@@ -364,13 +442,21 @@
     };
   }
 
-  /** 巻末の用語ミニ辞典（1つの書き直せる文。1行目に断り、続けてまとまりごとに空の行・見出し（■）・「用語：意味」を1行ずつ）。 */
-  function buildGlossarySection() {
+  /**
+   * 巻末の用語ミニ辞典（1つの書き直せる文。1行目に断り、続けてまとまりごとに空の行・見出し（■）・「用語：意味」を1行ずつ）。
+   * 最後に、この鑑定書に出た特殊星のまとまり（前置きの1行のあと。出た星がなければ載せない）
+   */
+  function buildGlossarySection(table) {
     var lines = [GLOSSARY.lead];
     GLOSSARY.groups.forEach(function (group) {
       lines.push('', GLOSSARY_GROUP_MARK + group[0]);
       group[1].forEach(function (entry) { lines.push(entry[0] + '：' + entry[1]); });
     });
+    var stars = collectStarNotes(table);
+    if (stars.length) {
+      lines.push('', GLOSSARY_GROUP_MARK + STAR_GROUP_TITLE, STAR_GROUP_LEAD);
+      stars.forEach(function (note) { lines.push(note[0] + '：' + note[1]); });
+    }
     var text = lines.join('\n');
     return {
       key: GLOSSARY.key, title: GLOSSARY.title, closable: true, className: 'report-extra report-glossary', parts: [
@@ -380,13 +466,14 @@
     };
   }
 
-  /** 最後のページ「今日からできること」（本文の再掲。同じキーなので、どちらで書き直しても同じ文になる）。 */
+  /** 最後のページ「今日からできること」（本文の1文目。本文とは別の文として書き直せる。字数に数えない）。 */
   function buildTodaySection(table) {
     var keyMap = table.buildKeyMap();
     var parts = [];
     TODAY.items.forEach(function (item) {
       parts.push(buildHeading(5, item[0]));
-      parts.push(buildEditableLines(readKeyValue(keyMap, item[1]), item[1], TODAY.title + '／' + item[0], { isExtra: true }));
+      parts.push(buildEditableLines(firstSentence(readKeyValue(keyMap, item[1])), TODAY.editKeyPrefix + item[1],
+        TODAY.title + '／' + item[0], { isExtra: true }));
     });
     return { key: TODAY.key, title: TODAY.title, closable: true, className: 'report-extra report-today', parts: parts };
   }
@@ -396,7 +483,7 @@
     var chapters = buildReport(table);
     return [buildGlanceSection(table, chapters)]
       .concat(chapters.map(buildChapterSection))
-      .concat([buildGlossarySection(), buildTodaySection(table)]);
+      .concat([buildGlossarySection(table), buildTodaySection(table)]);
   }
 
   /** 鑑定書を container に書く。name は送った時点の氏名。 */

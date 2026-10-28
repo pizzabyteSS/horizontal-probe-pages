@@ -160,6 +160,11 @@
 
   var BUILDERS = { taiun: buildTaiun, nenun: buildNenun, getsuun: buildGetsuun, nichiun: buildNichiun };
 
+  // 総合（K列）の ◎○△注 の決まり（api_master.js の buildPeriodSummaryKey_ と _textdb_summary_period_v1 の sub1_text。
+  //   180キーで照合済み：通変星には関係なく、運気の点数と十二運で決まる。2026-10-28 ガクさん承認）
+  var SUMMARY_MARK_LEGEND = '総合の記号：◎＝運気の点数が60以上で、十二運が勢いのある段階（長生・冠帯・建禄・帝旺）／'
+    + '○＝60以上で、それ以外の十二運／△＝40〜59／注＝39以下（注意したい時期）。同じ点数でも十二運によって◎と○が分かれます。';
+
   /** kind（taiun・nenun・getsuun・nichiun）の運勢表の項目（開閉の単位は表ごと。docs/web-pdf-plan.md §4.5）。key は fortune.<kind>。 */
   function buildFortuneSection(table, kind) {
     var spec = FORTUNE[kind];
@@ -168,6 +173,7 @@
       key: 'fortune.' + kind, title: spec.title, closable: true, parts: [
         { type: 'chart', title: spec.chartTitle, points: data.points, color: spec.color },
         { type: 'table', headers: spec.headers, rows: data.rows, className: 'is-wide is-fortune' },
+        { type: 'lines', text: SUMMARY_MARK_LEGEND, className: 'result-text report-tip', tone: 'tip' },
         // 内訳：総合と、通変星・十二運・位相法・空亡それぞれの評価（例「比肩：やや良い」）。本表の星の名前とは別の中身（GSS 版の右側の表）
         { type: 'heading', level: 4, text: '各要素の評価（内訳）', className: 'report-heading' },
         { type: 'table', headers: [spec.headers[0]].concat(BREAKDOWN_HEADERS), rows: data.breakdown, className: 'is-wide' }
@@ -234,6 +240,17 @@
     return bands;
   }
 
+  /** 4つの運勢表の、画面に出る行のすべてのセル（鑑定書の用語ミニ辞典で、出てくる特殊星を拾うため）。 */
+  function listFortuneCells(table) {
+    var cells = [];
+    VIEW.FORTUNE_KINDS.forEach(function (kind) {
+      BUILDERS[kind](table).rows.forEach(function (row) { cells = cells.concat(row); });
+    });
+    return cells;
+  }
+
+  VIEW.SUMMARY_MARK_LEGEND = SUMMARY_MARK_LEGEND;
+  VIEW.listFortuneCells = listFortuneCells;
   VIEW.readNenunTrend = readNenunTrend;
   VIEW.readTaiunBands = readTaiunBands;
   VIEW.FORTUNE_COLOR_NENUN = FORTUNE.nenun.color;

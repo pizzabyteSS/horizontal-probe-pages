@@ -2,7 +2,7 @@
 // web/src/pdf_document.js — 鑑定書 PDF・画像の中身を組み立て、ファイルにする入口（段階3a-1・3a-2）
 // 設計：docs/web-pdf-plan.md §4.2〜§4.6、docs/product-spec.md §4.1・§4.2
 //   中身は画面と同じ項目の一覧（view_result.js の buildResultModel）のうち、開いている項目だけ（3a-2）
-//   1ページ目の最初に鑑定情報を必ず置く（閉じられない。R4。鑑定書だけのときは、その上に「ひと目でわかるあなた」）。
+//   1ページ目の最初に鑑定情報を必ず置く（閉じられない。R4。鑑定書を含むときは、その上に「ひと目でわかるあなた」）。鑑定書が先、命式・運勢表が後
 //   各ページの上に屋号・氏名 様・鑑定日、下に n / N
 //   表はすべて表のまま載せる（行ごとのまとまりは見づらいため。2026-10-21 ガクさん）。
 //   運勢表（大運表〜日運表）は列が多いため A4 横のページに置く。命式詳細のミニ表（大運・年運・月運）は縦のページのまま
@@ -60,32 +60,42 @@
    */
   function buildReportDocument(model, options) {
     var opts = options || {};
-    var sections = VIEW.listOpenSections(model, opts.closedKeys || {});
     var isReport = function (section) { return String(section.key).indexOf(REPORT_SECTION_PREFIX) === 0; };
-    // 計算結果と鑑定書の両方を載せるときは、鑑定書を新しいページの題名「鑑定書」から始める
-    //   （計算結果の後にいきなり第1章が来て、鑑定書の始まりが分からなかった。2026-10-23 ガクさん）
+    // 鑑定書の章を先に、計算結果（命式・運勢表）を後に（鑑定書が37ページ目から始まっていた。2026-10-28 ガクさん承認）。
+    //   それぞれの中は画面のタブの順のまま
+    var openSections = VIEW.listOpenSections(model, opts.closedKeys || {});
+    var sections = openSections.filter(isReport).concat(openSections.filter(function (section) { return !isReport(section); }));
+    // 計算結果と鑑定書の両方を載せるときは、計算結果を新しいページの題名「命式・運勢表」から始める
     var hasBoth = sections.some(isReport) && sections.some(function (section) { return !isReport(section); });
-    // 鑑定書だけのときは、題名のすぐ下に「ひと目でわかるあなた」、鑑定情報はその下（2026-10-27 案1）。
-    //   両方のときは、鑑定書の始まり（題名「鑑定書」）の下に来る（鑑定書の項目の先頭のため）
-    var glance = hasBoth ? null : sections.filter(function (section) { return section.key === VIEW.REPORT_GLANCE_KEY; })[0] || null;
-    var blocks = [{ type: 'title', text: hasBoth ? CALC_TITLE : DOCUMENT_TITLE }]
+    // 題名のすぐ下に「ひと目でわかるあなた」、鑑定情報はその下（2026-10-27 案1）
+    var glance = sections.filter(function (section) { return section.key === VIEW.REPORT_GLANCE_KEY; })[0] || null;
+    var hasReport = sections.some(isReport);
+    var blocks = [{ type: 'title', text: hasReport ? DOCUMENT_TITLE : CALC_TITLE }]
       .concat(glance ? buildSectionBlocks(glance) : [])
       .concat(buildSectionBlocks(VIEW.buildInfoSection(model.info)));
     var orientation = 'portrait';
-    var reportStarted = false;
+    var calcStarted = false;
+    // 鑑定書の章が1つでも開いていれば、鑑定書の最後（計算結果の前）に字数（項目・鑑定文・合計）を載せる。納品物の字数として（2026-10-22 ガクさん）
+    var count = VIEW.countReportChars(model, null, opts.closedKeys || {}).open;
+    var pushCharCount = function () {
+      if (count.total <= 0) return;
+      if (orientation !== 'portrait') { blocks.push({ type: 'page', orientation: 'portrait' }); orientation = 'portrait'; }
+      blocks.push({ type: 'note', text: '本鑑定書の文字数： ' + VIEW.formatReportCharCount(count) });
+    };
     // 1ページ目は「ひと目でわかるあなた」と鑑定情報だけにし、続く項目は2ページ目から（章の頭だけが1ページ目の下に残らない）
     if (glance) blocks.push({ type: 'page', orientation: 'portrait', breakBefore: true });
     sections.forEach(function (section) {
       if (section === glance) return;
-      // 「今日からできること」は最後のページ（新しいページから。2026-10-27 案9）。題名の直後なら改めない
+      // 「今日からできること」は鑑定書の最後のページ（新しいページから。2026-10-27 案9）。題名の直後なら改めない
       if (section.key === VIEW.REPORT_TODAY_KEY && blocks[blocks.length - 1].type !== 'title') {
         blocks.push({ type: 'page', orientation: 'portrait', breakBefore: true });
         orientation = 'portrait';
       }
-      if (hasBoth && !reportStarted && isReport(section)) {
-        reportStarted = true;
+      if (hasBoth && !calcStarted && !isReport(section)) {
+        calcStarted = true;
+        pushCharCount();
         blocks.push({ type: 'page', orientation: 'portrait', breakBefore: true });
-        blocks.push({ type: 'title', text: DOCUMENT_TITLE });
+        blocks.push({ type: 'title', text: CALC_TITLE });
         orientation = 'portrait';
       }
       // 運勢表は横向きのページ。向きが変わるところで部品 page を入れる（その項目は新しいページから始まる）
@@ -93,12 +103,7 @@
       if (wanted !== orientation) { blocks.push({ type: 'page', orientation: wanted }); orientation = wanted; }
       blocks = blocks.concat(buildSectionBlocks(section));
     });
-    // 鑑定書の章が1つでも開いていれば、最後に字数（項目・鑑定文・合計）を載せる。納品物の字数として（2026-10-22 ガクさん）
-    var count = VIEW.countReportChars(model, null, opts.closedKeys || {}).open;
-    if (count.total > 0) {
-      if (orientation !== 'portrait') blocks.push({ type: 'page', orientation: 'portrait' });
-      blocks.push({ type: 'note', text: '本鑑定書の文字数： ' + VIEW.formatReportCharCount(count) });
-    }
+    if (!calcStarted) pushCharCount();
     var brand = opts.brand || {};
     var header = {
       name: model.info.name, kanteiDate: model.info.kanteiDate, brandName: brand.name || '', brandColor: brand.color || '', brandFontFamily: brand.fontFamily || '',
