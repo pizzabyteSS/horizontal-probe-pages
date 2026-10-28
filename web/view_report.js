@@ -209,13 +209,15 @@
         ['偏財・正財', '自分が得るもの。お金、実利'], ['偏官・正官', '自分を律するもの。責任、地位'],
         ['偏印・印綬', '自分を支えるもの。学び、守り'],
         ['十二運', 'エネルギーの強弱を、人の一生にたとえた12段階（長生・沐浴・冠帯・建禄・帝旺・衰・病・死・墓・絶・胎・養）。帝旺・建禄は強く、墓・絶は静かなど'],
+        ['十二運の「死」', '命が終わるという意味ではなく、勢いが静まり、内面が深まる段階。落ち着いて物事を見極める力'],
         ['蔵干', '地支の中に隠れている天干。内面や隠れた資質'],
         ['身強弱', '日干のエネルギーの強さ。強いほど自力型、弱いほど周りの力を活かす型'],
         ['用神・喜神・守護神', '命式のバランスを整え、助けてくれる五行'],
         ['財星', 'お金や財に関わる通変星（偏財・正財）'],
         ['大運・年運・月運・日運', '10年・1年・1か月・1日ごとの運気の流れ'],
         ['位相法', '干支どうしの組み合わせ（合・冲・刑・害・破）から、出来事の起こりやすさを見る'],
-        ['空亡（天中殺）', '運気が空回りしやすい時期の目印']
+        ['空亡（天中殺）', '運気が空回りしやすい時期の目印'],
+        ['宿命中殺', '生まれつき命式の中に空亡の地支があること（生年中殺・生月中殺・生日中殺）。その柱が表すことに、独特の出方をしやすい目印']
       ]]
     ]
   };
@@ -245,11 +247,13 @@
     ['駅馬', '移動が多く、活動の範囲が広がりやすい'], ['劫殺', '外からの急な変化や刺激が入りやすい。備えがあれば転機になる'],
     ['亡神', '考えすぎや焦りが出やすい。休む時間を大切に'], ['白虎', '焦りから物事が荒れやすい。落ち着いて進めると吉'],
     ['血刃', '日常の油断によるミスや、体調管理に気をつけたい'], ['隔角', '身内や家庭との距離感を大切に'],
-    ['孤辰', 'ひとりの時間を必要とする傾向（男性に強く出やすい）'], ['寡宿', 'ひとりで抱え込みやすい傾向（女性に強く出やすい）'],
+    ['孤辰', 'ひとりの時間を必要とする傾向'], ['寡宿', 'ひとりで抱え込みやすい傾向'],
     ['囚獄', '契約・約束・締め切りなどの決まりごとに気をつけたい'], ['黄旛', '責任感の強さが、頑固さに見えやすい'],
     ['弔客', '共感する力が強いぶん、気疲れしやすい'], ['死符', '区切りをつけて手放し、新しくする好機'],
     ['病符', '疲れやすさに注意。ペース配分を大切に']
   ];
+  // 性別で出方が変わる星：鑑定する人の性別（_data の性別。'男性'・'女性'）と同じときだけ、意味の後ろに添える（2026-10-28 ガクさん承認）
+  var STAR_SEX_NOTES = { '孤辰': ['男性', '（男性に強く出やすい）'], '寡宿': ['女性', '（女性に強く出やすい）'] };
   var STAR_SPLIT = /[・、,\/\s]+/;
   var MEISHIKI_STAR_ROW = 325;   // 命式の特殊星（325〜328行。星の名前は A列、柱ごとの印は B〜E列。view_meishiki.js の STAR_START）
   var MEISHIKI_STAR_COUNT = 4;
@@ -271,6 +275,9 @@
   /** 西暦の年の地支（0＝子。2020年＝子）。 */
   function branchOfYear(year) { return ((year - 4) % 12 + 12) % 12; }
 
+  // 天中殺の年の1行の後ろに添える、月・日の天中殺の説明（2026-10-28 ガクさん承認）
+  var TENCHU_MONTH_DAY_TEXT = '月運表・日運表の空亡の欄に「天中殺」とある月・日も、同じく空回りしやすい時期の目印です（総合の記号は運気の点数どおりに付けています）。';
+
   /** 天中殺の年の1行（空亡か年が読めなければ ''）。 */
   function buildTenchuYearText(kuubouKey, startYear) {
     var pair = Object.prototype.hasOwnProperty.call(KUUBOU_BRANCHES, kuubouKey) ? KUUBOU_BRANCHES[kuubouKey] : null;
@@ -278,10 +285,10 @@
     if (!pair || isNaN(year)) return '';
     var head = 'あなたの天中殺は' + BRANCH_CHARS.charAt(pair[0]) + '年・' + BRANCH_CHARS.charAt(pair[1]) + '年です（年の区切りは立春）。';
     var branch = branchOfYear(year);
-    if (branch === pair[0]) return head + '今年（' + year + '年）から' + (year + 1) + '年までの2年間がその時期にあたります。';
-    if (branch === pair[1]) return head + '今年（' + year + '年）は天中殺の2年目にあたります。';
+    if (branch === pair[0]) return head + '今年（' + year + '年）から' + (year + 1) + '年までの2年間がその時期にあたります。' + TENCHU_MONTH_DAY_TEXT;
+    if (branch === pair[1]) return head + '今年（' + year + '年）は天中殺の2年目にあたります。' + TENCHU_MONTH_DAY_TEXT;
     var first = year + (pair[0] - branch + 12) % 12;
-    return head + '次は' + first + '〜' + (first + 1) + '年で、今年（' + year + '年）は該当しません。';
+    return head + '次は' + first + '〜' + (first + 1) + '年で、今年（' + year + '年）は該当しません。' + TENCHU_MONTH_DAY_TEXT;
   }
 
   /** 文の1文目（「。」まで。なければ全文）。 */
@@ -299,7 +306,11 @@
     cells.forEach(function (cell) {
       String(cell === null || cell === undefined ? '' : cell).split(STAR_SPLIT).forEach(function (token) { if (token) found[token] = true; });
     });
-    return STAR_NOTES.filter(function (note) { return found[note[0]]; });
+    var sex = VIEW.readCommonInfo(table, '').sex;
+    return STAR_NOTES.filter(function (note) { return found[note[0]]; }).map(function (note) {
+      var sexNote = Object.prototype.hasOwnProperty.call(STAR_SEX_NOTES, note[0]) ? STAR_SEX_NOTES[note[0]] : null;
+      return sexNote && sexNote[0] === sex ? [note[0], note[1] + sexNote[1]] : note;
+    });
   }
 
   /** 空・null・'null'・'undefined' は空文字、そうでなければ文字にする（GSS 版の safe_）。 */

@@ -16,11 +16,7 @@
     STAR_START: 325, STAR_COUNT: 4,
     BALANCE_START: 238, STRENGTH: 280,   // 身強弱（B＝点数・C＝5段階のラベル。api_master.js の _convertResultToDataRows_）
     NIKKAN_LEFT_START: 393, NIKKAN_LEFT_COUNT: 12, NIKKAN_SUMMARY_START: 406,
-    TSUHEN_DIST_START: 309, YOJIN_MATRIX_START: 364, YOJIN: 321, KIJIN: 322,
-    TAIUN_DIR: 380, TAIUN_AGE: 381,
-    TAIUN_HEADER: 82, TAIUN_START: 83, TAIUN_COUNT: 11,   // 立運前＋大運10行（docs/web-screen-items.md §5.2）
-    NENUN_HEADER: 102, NENUN_START: 103, NENUN_COUNT: 60, MINI_NENUN_COUNT: 10,   // ミニ年運は10年（GSS 版は5年。2026-10-21 ガクさん）
-    GETSUUN_HEADER: 172, GETSUUN_START: 173, GETSUUN_COUNT: 12
+    TSUHEN_DIST_START: 309, YOJIN_MATRIX_START: 364, YOJIN: 321, KIJIN: 322
   };
   var PILLAR_HEADERS = ['', '年柱', '月柱', '日柱', '時柱'];
   var DAY_PILLAR_INDEX = 2;   // 年柱・月柱・日柱・時柱のうち日柱
@@ -28,9 +24,10 @@
   var TSUHEN_NAMES = ['比肩', '劫財', '食神', '傷官', '偏財', '正財', '偏官', '正官', '偏印', '印綬'];   // 同 tsuhenNames
   var ISHIKI_NONE = '該当なし';
   var KUUBOU_NONE = 'なし';
+  var GOGYO_TOTAL_NOTE = '合計は天干・地支に出ている数です（蔵干は含みません）。';
 
   /**
-   * 命式詳細の項目（開閉の単位は画面の見出しのまとまり。docs/web-pdf-plan.md §4.5）。now はミニ年運の「今年」を決める時刻。
+   * 命式詳細の項目（開閉の単位は画面の見出しのまとまり。docs/web-pdf-plan.md §4.5）。now は使わない（ミニ年運を外したため。呼び出し側に合わせて残す）。
    * 鑑定情報は含めない（view_common.js の buildInfoSection）。
    */
   function buildMeishikiSections(table, now) {
@@ -41,14 +38,11 @@
       buildGuardian(table),
       buildNikkanStrength(table),
       buildTsuhenDistribution(table),
-      buildYojin(table),
-      buildTaiunMini(table),
-      buildNenunMini(table, VIEW.readJstYear(now)),
-      buildGetsuunMini(table)
+      buildYojin(table)
     ];
   }
 
-  /** 命式詳細を container に書く。name は画面に入力された氏名、now はミニ年運の「今年」を決める時刻。 */
+  /** 命式詳細を container に書く。name は画面に入力された氏名、now は使わない（呼び出し側に合わせて残す）。 */
   function renderMeishiki(container, table, name, now) {
     VIEW.renderSections(container, [VIEW.buildInfoSection(VIEW.readCommonInfo(table, name))].concat(buildMeishikiSections(table, now)));
   }
@@ -64,6 +58,11 @@
 
   function linesPart(text) {
     return { type: 'lines', text: text };
+  }
+
+  /** 表の下の小さな注記（PDF は小さめの灰色）。 */
+  function tipPart(text) {
+    return { type: 'lines', text: text, className: 'result-text report-tip', tone: 'tip' };
   }
 
   /** B〜E列（年柱〜時柱）を「-」付きで読む。 */
@@ -116,7 +115,7 @@
     var rows = block.map(function (values, i) {
       return [GOGYO_NAMES[i], VIEW.formatOrDash(values[1]), VIEW.formatOrDash(values[2]), VIEW.formatOrDash(values[3]), VIEW.formatOrDash(values[0])];
     });
-    return createSection('gogyo', '五行バランス', [tablePart(['', '天干', '地支', '蔵干', '合計'], rows)]);
+    return createSection('gogyo', '五行バランス', [tablePart(['', '天干', '地支', '蔵干', '合計'], rows), tipPart(GOGYO_TOTAL_NOTE)]);
   }
 
   // 守護神（GSS 版 E37:E38。28行の D・E）
@@ -127,18 +126,32 @@
     ])]);
   }
 
+  // 日干強弱の内訳の用語を、読む人向けの言い方にする（表示だけ。_data の文字は GSS 版と同じまま。2026-10-28 ガクさん承認）
+  var NIKKAN_TERMS = {
+    '月令ボーナス(+3/+1/0)': '生まれ月の加点（+3/+1/0）',
+    '天干スコア': '天干の点数',
+    '地支蔵干スコア（年・月・時）': '地支の蔵干の点数（年・月・時）',
+    '月令スコア': '生まれ月の加点',
+    '日支蔵干スコア（座下補正）': '日支の加点'
+  };
+  /** 日干強弱の表のセル（「-」付き）。NIKKAN_TERMS にある文字は言い換える。 */
+  function formatNikkanCell(value) {
+    var text = VIEW.formatOrDash(value);
+    return Object.prototype.hasOwnProperty.call(NIKKAN_TERMS, text) ? NIKKAN_TERMS[text] : text;
+  }
+
   // 日干強弱（GSS 版 D42:F53・I42:I46。左は B＝判定対象・D＝スコア寄与・C＝解釈補助、右は 406〜409行の B と 410行の C）
   function buildNikkanStrength(table) {
     var left = table.getBlock(ROW.NIKKAN_LEFT_START, 1, ROW.NIKKAN_LEFT_COUNT, 5).map(function (values) {
-      return [VIEW.formatOrDash(values[0]), VIEW.formatOrDash(values[1]), VIEW.formatOrDash(values[3]), VIEW.formatOrDash(values[2])];
+      return [formatNikkanCell(values[0]), formatNikkanCell(values[1]), formatNikkanCell(values[3]), formatNikkanCell(values[2])];
     });
     var summary = [];
     for (var i = 0; i < 4; i++) {
       var rowNo = ROW.NIKKAN_SUMMARY_START + i;
-      summary.push([VIEW.formatOrDash(table.get(rowNo, 1)), VIEW.formatOrDash(table.get(rowNo, 2))]);
+      summary.push([formatNikkanCell(table.get(rowNo, 1)), VIEW.formatOrDash(table.get(rowNo, 2))]);
     }
     summary.push(['5段階判定', VIEW.formatOrDash(table.get(ROW.NIKKAN_SUMMARY_START + 4, 3))]);
-    return createSection('nikkan', '日干強弱', [tablePart(['項目', '判定対象', 'スコア寄与', '解釈補助'], left), tablePart(null, summary)]);
+    return createSection('nikkan', '日干強弱', [tablePart(['項目', '判定対象', '点数', '解釈補助'], left), tablePart(null, summary)]);
   }
 
   // 通変星分布（GSS 版 C57:E67。309〜319行の B:D。空はそのまま）
@@ -154,53 +167,10 @@
   function buildYojin(table) {
     var block = table.getBlock(ROW.YOJIN_MATRIX_START, 2, GOGYO_NAMES.length, 3);
     var rows = block.map(function (values, i) { return [GOGYO_NAMES[i]].concat(values.map(VIEW.formatOrEmpty)); });
-    return createSection('yojin', '用神', [tablePart(['', '強弱', '不足', '合計'], rows), tablePart(null, [
+    return createSection('yojin', '用神', [tablePart(['', '今の強さ', '足りない度合い', '合計'], rows), tablePart(null, [
       ['用神', VIEW.formatOrDash(table.get(ROW.YOJIN, 2))],
       ['喜神', VIEW.formatOrDash(table.get(ROW.KIJIN, 2))]
     ])]);
-  }
-
-  /** 見出しの行（A列から count 列）を文字にする。 */
-  function readHeaders(table, rowNo, colNo, count) {
-    return table.getRow(rowNo, colNo, count).map(VIEW.formatOrEmpty);
-  }
-
-  // 順逆・立運とミニ大運（GSS 版 B80・B82:J91。83〜93行の B:J、空の行は飛ばす。GSS 版は 92行まで：§5.2）
-  function buildTaiunMini(table) {
-    var direction = VIEW.formatOrDash(table.get(ROW.TAIUN_DIR, 2));
-    var age = VIEW.formatOrDash(table.get(ROW.TAIUN_AGE, 2));
-    var rows = [];
-    var block = table.getBlock(ROW.TAIUN_START, 1, ROW.TAIUN_COUNT, 10);
-    for (var i = 0; i < block.length; i++) {
-      if (!VIEW.hasAnyValue(block[i])) continue;
-      rows.push(block[i].slice(1).map(VIEW.formatOrDash));
-    }
-    return createSection('taiun', '大運', [
-      linesPart('順逆: ' + direction + ' / 立運: ' + age + '歳'),
-      tablePart(readHeaders(table, ROW.TAIUN_HEADER, 2, 9), rows, 'is-wide')
-    ]);
-  }
-
-  // ミニ年運（GSS 版 B95:K99。103〜162行のうち、A列の先頭4桁の年が今年（日本時間）以上の最初の10行。GSS 版は5行）
-  function buildNenunMini(table, currentYear) {
-    var rows = [];
-    var block = table.getBlock(ROW.NENUN_START, 1, ROW.NENUN_COUNT, 10);
-    for (var i = 0; i < block.length && rows.length < ROW.MINI_NENUN_COUNT; i++) {
-      var match = String(block[i][0]).match(/^(\d{4})/);
-      if (match && Number(match[1]) >= currentYear) rows.push(block[i].map(VIEW.formatOrDash));
-    }
-    return createSection('nenun', '年運（今年から10年）', [tablePart(readHeaders(table, ROW.NENUN_HEADER, 1, 10), rows, 'is-wide')]);
-  }
-
-  // ミニ月運（GSS 版 B103:K114。173〜184行の A:J、空の行は飛ばす。A列「2026年10月」は文字のまま出す。docs/web-screen-items.md §5 の 4）
-  function buildGetsuunMini(table) {
-    var rows = [];
-    var block = table.getBlock(ROW.GETSUUN_START, 1, ROW.GETSUUN_COUNT, 11);   // 空の行の判定は A:K（GSS 版と同じ）、出すのは A:J
-    for (var i = 0; i < block.length; i++) {
-      if (!VIEW.hasAnyValue(block[i])) continue;
-      rows.push(block[i].slice(0, 10).map(VIEW.formatOrDash));
-    }
-    return createSection('getsuun', '月運（12か月）', [tablePart(readHeaders(table, ROW.GETSUUN_HEADER, 1, 10), rows, 'is-wide')]);
   }
 
   // ---- 鑑定書の図の値（段階2：鑑定書のわかりやすさ。view_figure.js が描く） ----

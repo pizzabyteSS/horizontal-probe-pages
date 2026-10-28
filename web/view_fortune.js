@@ -38,6 +38,21 @@
     }
   };
 
+  // 月運表・日運表で空亡（H列）が「天中殺」の行は、解説（L列）の前に注記を付ける。総合の記号は点数どおりのまま（2026-10-28 ガクさん承認）
+  var KUUBOU_COL = 7;
+  var COMMENT_COL = 11;
+  var TENCHU_MARK = '天中殺';
+
+  /** 月運・日運の本表の行（B〜L列。「-」付き）。天中殺の行は解説の前に unit（'月'・'日'）の注記を付ける。 */
+  function buildPeriodRow(label, values, unit) {
+    var cells = values.slice(1, 12).map(VIEW.formatOrDash);
+    if (String(values[KUUBOU_COL] || '') === TENCHU_MARK) {
+      var comment = VIEW.isBlank(values[COMMENT_COL]) ? '' : String(values[COMMENT_COL]);
+      cells[COMMENT_COL - 1] = '【天中殺の' + unit + '】新しく始めることは慎重に。' + comment;
+    }
+    return [label].concat(cells);
+  }
+
   /** 表の右側の行：見出し・総合（K）・M〜P。 */
   function buildBreakdown(label, values) {
     return [label, VIEW.formatOrDash(values[10])].concat(values.slice(12, 16).map(VIEW.formatOrDash));
@@ -125,7 +140,7 @@
       if (!VIEW.hasAnyValue(values)) return;
       var label = VIEW.formatOrDash(values[0]);
       var score = VIEW.formatOrDash(values[spec.scoreCol]);
-      result.rows.push([label].concat(values.slice(1, 12).map(VIEW.formatOrDash)));
+      result.rows.push(buildPeriodRow(label, values, '月'));
       result.breakdown.push(buildBreakdown(label, values));
       pushChartPoint(result.points, label, score);
     });
@@ -151,7 +166,7 @@
       if (!values[0]) break;
       var label = formatDayLabel(values[0]);
       var score = VIEW.formatOrDash(values[spec.scoreCol]);
-      result.rows.push([label].concat(values.slice(1, 12).map(VIEW.formatOrDash)));
+      result.rows.push(buildPeriodRow(label, values, '日'));
       result.breakdown.push(buildBreakdown(label, values));
       pushChartPoint(result.points, label, score);
     }
@@ -165,19 +180,29 @@
   var SUMMARY_MARK_LEGEND = '総合の記号：◎＝運気の点数が60以上で、十二運が勢いのある段階（長生・冠帯・建禄・帝旺）／'
     + '○＝60以上で、それ以外の十二運／△＝40〜59／注＝39以下（注意したい時期）。同じ点数でも十二運によって◎と○が分かれます。';
 
+  // 大運表の先頭に置く順逆・立運（GSS 版 B80。380・381行の B）。命式詳細のミニ大運を外したので、ここへ移した（PR③、2026-10-28）
+  var TAIUN_DIR_ROW = 380;
+  var TAIUN_AGE_ROW = 381;
+
+  /** 大運表の先頭の1行「順逆: 逆 / 立運: 8歳」。 */
+  function buildTaiunDirectionText(table) {
+    return '順逆: ' + VIEW.formatOrDash(table.get(TAIUN_DIR_ROW, 2)) + ' / 立運: ' + VIEW.formatOrDash(table.get(TAIUN_AGE_ROW, 2)) + '歳';
+  }
+
   /** kind（taiun・nenun・getsuun・nichiun）の運勢表の項目（開閉の単位は表ごと。docs/web-pdf-plan.md §4.5）。key は fortune.<kind>。 */
   function buildFortuneSection(table, kind) {
     var spec = FORTUNE[kind];
     var data = BUILDERS[kind](table);
+    var parts = kind === 'taiun' ? [{ type: 'lines', text: buildTaiunDirectionText(table) }] : [];
     return {
-      key: 'fortune.' + kind, title: spec.title, closable: true, parts: [
+      key: 'fortune.' + kind, title: spec.title, closable: true, parts: parts.concat([
         { type: 'chart', title: spec.chartTitle, points: data.points, color: spec.color },
         { type: 'table', headers: spec.headers, rows: data.rows, className: 'is-wide is-fortune' },
         { type: 'lines', text: SUMMARY_MARK_LEGEND, className: 'result-text report-tip', tone: 'tip' },
         // 内訳：総合と、通変星・十二運・位相法・空亡それぞれの評価（例「比肩：やや良い」）。本表の星の名前とは別の中身（GSS 版の右側の表）
         { type: 'heading', level: 4, text: '各要素の評価（内訳）', className: 'report-heading' },
         { type: 'table', headers: [spec.headers[0]].concat(BREAKDOWN_HEADERS), rows: data.breakdown, className: 'is-wide' }
-      ]
+      ])
     };
   }
 
