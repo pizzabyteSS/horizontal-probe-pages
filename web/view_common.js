@@ -100,9 +100,13 @@
     };
   }
 
-  /** 鑑定情報の項目（閉じられない。docs/product-spec.md §4.2：鑑定日と計算に使った入力を必ず載せる）。 */
+  // 出生時刻が不明のときの断り（時柱を使わずに計算する。api_master.js の hourUnknown。2026-10-28 ガクさん承認）
+  var BIRTH_TIME_UNKNOWN = '不明';
+  var BIRTH_TIME_UNKNOWN_NOTE = '出生時刻が不明のため、時柱を使わずに計算しています。時刻が分かると日干の強さ・タイプ・鑑定文が変わることがあります。';
+
+  /** 鑑定情報の項目（閉じられない。docs/product-spec.md §4.2：鑑定日と計算に使った入力を必ず載せる）。出生時刻が不明なら断りを添える。 */
   function buildInfoSection(info) {
-    return {
+    var section = {
       key: INFO_SECTION_KEY, title: '鑑定情報', closable: false, parts: [{
         type: 'table', headers: null, className: 'is-info', rows: [
           ['鑑定日', info.kanteiDate],
@@ -115,6 +119,10 @@
         ]
       }]
     };
+    if (info.birthTime === BIRTH_TIME_UNKNOWN) {
+      section.parts.push({ type: 'lines', text: BIRTH_TIME_UNKNOWN_NOTE, className: 'result-text report-tip', tone: 'tip' });
+    }
+    return section;
   }
 
   function appendCommonInfo(container, info) {

@@ -498,8 +498,11 @@
       if (head) addTableRowItems(cursor, head, widths, true, 0, head.lineCount, measure, { block: index, role: 'tableHead' });
     };
     var rows = block.rows.map(function (row) { return measureTableRow(row, widths, false, measure, charWidth); });
-    // 見出しの行と1行目（の少なくとも1行）が入らなければ次のページから始める
-    var firstNeed = headHeight + (rows.length ? Math.min(rows[0].height, lineHeight + CELL_PADDING * 2) : 0);
+    // 見出しの行と1行目が入らなければ次のページから始める。1行目がページより高いときだけ、その最初の1行ぶんで判定する
+    //   （1行目を丸ごとで判定しないと、見出しの行だけがページの下に残る。下の行の置き方と同じ境目。2026-10-28）
+    var firstRowNeed = !rows.length ? 0
+      : rows[0].height <= cursor.bodyHeight - headHeight ? rows[0].height : lineHeight + CELL_PADDING * 2;
+    var firstNeed = headHeight + firstRowNeed;
     if (!cursor.isTop() && firstNeed > cursor.remaining()) cursor.newPage();
     placeHead();
     rows.forEach(function (shape, r) {

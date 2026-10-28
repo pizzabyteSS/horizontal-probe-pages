@@ -38,19 +38,25 @@
     }
   };
 
-  // 月運表・日運表で空亡（H列）が「天中殺」の行は、解説（L列）の前に注記を付ける。総合の記号は点数どおりのまま（2026-10-28 ガクさん承認）
+  // 年運表・月運表・日運表で空亡（H列）が「天中殺」の行は、解説（L列）の前に注記を付ける。総合の記号は点数どおりのまま（2026-10-28 ガクさん承認）
+  //   解説の文はサーバーが天中殺の行だけ見直す・整える文を選ぶ（api_master.js の buildPeriodTextKey_）
   var KUUBOU_COL = 7;
   var COMMENT_COL = 11;
   var TENCHU_MARK = '天中殺';
 
-  /** 月運・日運の本表の行（B〜L列。「-」付き）。天中殺の行は解説の前に unit（'月'・'日'）の注記を付ける。 */
-  function buildPeriodRow(label, values, unit) {
+  /** 年運・月運・日運の本表のB〜L列（「-」付き）。天中殺の行は解説の前に unit（'年'・'月'・'日'）の注記を付ける。 */
+  function buildPeriodCells(values, unit) {
     var cells = values.slice(1, 12).map(VIEW.formatOrDash);
     if (String(values[KUUBOU_COL] || '') === TENCHU_MARK) {
       var comment = VIEW.isBlank(values[COMMENT_COL]) ? '' : String(values[COMMENT_COL]);
       cells[COMMENT_COL - 1] = '【天中殺の' + unit + '】新しく始めることは慎重に。' + comment;
     }
-    return [label].concat(cells);
+    return cells;
+  }
+
+  /** 月運・日運の本表の行（見出し＋B〜L列）。 */
+  function buildPeriodRow(label, values, unit) {
+    return [label].concat(buildPeriodCells(values, unit));
   }
 
   /** 表の右側の行：見出し・総合（K）・M〜P。 */
@@ -99,7 +105,7 @@
       var year = yearMatch ? yearMatch[1] : VIEW.formatOrDash(values[0]);
       var age = ageMatch ? ageMatch[1] : '-';
       var score = VIEW.formatOrDash(values[spec.scoreCol]);
-      result.rows.push([year, age].concat(values.slice(1, 12).map(VIEW.formatOrDash)));
+      result.rows.push([year, age].concat(buildPeriodCells(values, '年')));
       result.breakdown.push(buildBreakdown(year, values));
       pushChartPoint(result.points, year, score);
     }
