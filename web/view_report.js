@@ -212,7 +212,8 @@
         ['十二運の「死」', '命が終わるという意味ではなく、勢いが静まり、内面が深まる段階。落ち着いて物事を見極める力'],
         ['蔵干', '地支の中に隠れている天干。内面や隠れた資質'],
         ['身強弱', '日干のエネルギーの強さ。強いほど自力型、弱いほど周りの力を活かす型'],
-        ['用神・喜神・守護神', '命式のバランスを整え、助けてくれる五行'],
+        ['用神・喜神', '命式の強弱と五行の偏りから選ぶ、バランスを整える五行。用神が第一、喜神が第二'],
+        ['守護神', '日干と生まれ月の組み合わせから選ぶ、命式を助ける天干。用神とは選び方が違う'],
         ['財星', 'お金や財に関わる通変星（偏財・正財）'],
         ['大運・年運・月運・日運', '10年・1年・1か月・1日ごとの運気の流れ'],
         ['位相法', '干支どうしの組み合わせ（合・冲・刑・害・破）から、出来事の起こりやすさを見る'],
@@ -257,7 +258,8 @@
   var STAR_SPLIT = /[・、,\/\s]+/;
   var MEISHIKI_STAR_ROW = 325;   // 命式の特殊星（325〜328行。星の名前は A列、柱ごとの印は B〜E列。view_meishiki.js の STAR_START）
   var MEISHIKI_STAR_COUNT = 4;
-  // 最後のページ「今日からできること」：本文の1文目だけを短く載せる（全文の再掲だったため。2026-10-28 ガクさん承認）。
+  // 最後のページ「今日からできること」：本文とは別の、行動の一文（_data の C列。textdb の sub1_text。2026-10-28 #15）。
+  //   C列が空のとき（文の表が古いなど）は本文の1文目を載せる。
   //   [題名, 本文のキー]。キーは CHAPTERS の reports と同じ。書き直しは本文とは別の文（WEB_TODAY_ ＋ 本文のキー）
   var TODAY = {
     key: 'report.today', title: '今日からできること', editKeyPrefix: 'WEB_TODAY_',
@@ -477,13 +479,14 @@
     };
   }
 
-  /** 最後のページ「今日からできること」（本文の1文目。本文とは別の文として書き直せる。字数に数えない）。 */
+  /** 最後のページ「今日からできること」（行動の一文。なければ本文の1文目。本文とは別の文として書き直せる。字数に数えない）。 */
   function buildTodaySection(table) {
     var keyMap = table.buildKeyMap();
     var parts = [];
     TODAY.items.forEach(function (item) {
       parts.push(buildHeading(5, item[0]));
-      parts.push(buildEditableLines(firstSentence(readKeyValue(keyMap, item[1])), TODAY.editKeyPrefix + item[1],
+      var action = readKeyValue(keyMap, item[1], COL_C) || firstSentence(readKeyValue(keyMap, item[1]));
+      parts.push(buildEditableLines(action, TODAY.editKeyPrefix + item[1],
         TODAY.title + '／' + item[0], { isExtra: true }));
     });
     return { key: TODAY.key, title: TODAY.title, closable: true, className: 'report-extra report-today', parts: parts };

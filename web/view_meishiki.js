@@ -25,6 +25,15 @@
   var ISHIKI_NONE = '該当なし';
   var KUUBOU_NONE = 'なし';
   var GOGYO_TOTAL_NOTE = '合計は天干・地支に出ている数です（蔵干は含みません）。';
+  // 表の下の注記（2026-10-28。計算は変えず、読み方だけを書く）
+  //   身強弱のしきい値は constants.js NIKKAN_STRENGTH_THRESHOLDS（5・2）と api_master.js calcNikkanStrength_ の判定に合わせる
+  var NIKKAN_RANGE_NOTE = '5段階の目安：強い 5以上／やや強い 2以上5未満／中和 −2より大きく2未満／やや弱い −5より大きく−2以下／弱い −5以下。';
+  //   用神の表は calcYojin_（強弱補正＝KYOJAKU_YOJIN_SCORES、不足補正＝0〜FUSOKU_MAX）
+  var YOJIN_NOTE = '「強弱から見た必要度」は、日干が強ければ抑える五行に、弱ければ助ける五行に点が付きます（中和はすべて0）。'
+    + '「不足の度合い」は、命式に少ない五行ほど高くなります（いちばん多い五行が0、いちばん少ない五行が3。すべて同じ数なら0）。'
+    + '合計がいちばん大きい五行が用神、次が喜神です。';
+  //   守護神は calcGuardianGod_（日干×月支の守護神の表）。用神とは選び方が違う
+  var GUARDIAN_NOTE = '守護神は、日干と生まれ月の組み合わせから選ぶ天干です。命式の強弱と五行の偏りから選ぶ用神（五行）とは、選び方が違います。';
 
   /**
    * 命式詳細の項目（開閉の単位は画面の見出しのまとまり。docs/web-pdf-plan.md §4.5）。now は使わない（ミニ年運を外したため。呼び出し側に合わせて残す）。
@@ -123,7 +132,7 @@
     return createSection('guardian', '守護神', [tablePart(null, [
       ['第一候補', VIEW.formatOrDash(table.get(ROW.GOSHUGOSIN, 4))],
       ['第二候補', VIEW.formatOrDash(table.get(ROW.GOSHUGOSIN, 5))]
-    ])]);
+    ]), tipPart(GUARDIAN_NOTE)]);
   }
 
   // 日干強弱の内訳の用語を、読む人向けの言い方にする（表示だけ。_data の文字は GSS 版と同じまま。2026-10-28 ガクさん承認）
@@ -151,7 +160,7 @@
       summary.push([formatNikkanCell(table.get(rowNo, 1)), VIEW.formatOrDash(table.get(rowNo, 2))]);
     }
     summary.push(['5段階判定', VIEW.formatOrDash(table.get(ROW.NIKKAN_SUMMARY_START + 4, 3))]);
-    return createSection('nikkan', '日干強弱', [tablePart(['項目', '判定対象', '点数', '解釈補助'], left), tablePart(null, summary)]);
+    return createSection('nikkan', '日干強弱', [tablePart(['項目', '判定対象', '点数', '解釈補助'], left), tablePart(null, summary), tipPart(NIKKAN_RANGE_NOTE)]);
   }
 
   // 通変星分布（GSS 版 C57:E67。309〜319行の B:D。空はそのまま）
@@ -164,13 +173,14 @@
   }
 
   // 用神（GSS 版 C71:E75 のマトリクスは空のまま出す。E76・E77 の用神・喜神は「-」付き）
+  //   列は強弱補正・不足補正・合計（GSS 版の見出し）。「今の強さ」は五行の数と誤解されたので言い換えた（2026-10-28）
   function buildYojin(table) {
     var block = table.getBlock(ROW.YOJIN_MATRIX_START, 2, GOGYO_NAMES.length, 3);
     var rows = block.map(function (values, i) { return [GOGYO_NAMES[i]].concat(values.map(VIEW.formatOrEmpty)); });
-    return createSection('yojin', '用神', [tablePart(['', '今の強さ', '足りない度合い', '合計'], rows), tablePart(null, [
+    return createSection('yojin', '用神', [tablePart(['', '強弱から見た必要度', '不足の度合い', '合計'], rows), tablePart(null, [
       ['用神', VIEW.formatOrDash(table.get(ROW.YOJIN, 2))],
       ['喜神', VIEW.formatOrDash(table.get(ROW.KIJIN, 2))]
-    ])]);
+    ]), tipPart(YOJIN_NOTE)]);
   }
 
   // ---- 鑑定書の図の値（段階2：鑑定書のわかりやすさ。view_figure.js が描く） ----
