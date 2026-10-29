@@ -116,10 +116,13 @@
     },
     {
       title: '第7章｜運勢の流れ', summaryKey: 'KANTEI_SUMMARY_CH7', icon: { name: 'trend', color: '#5b5fb8' },
+      // 要約は人の性質でなく時期の説明なので、見出しを「あなたの傾向」から替える（2026-10-29 #24）
+      summaryHeading: 'いまの流れ',
       figures: ['decade', 'nenun'], markLegend: true,
       tip: '大運＝10年ごとの運気の流れ。年運＝1年ごとの運気。位相法＝その年の干支と命式の組み合わせ、空亡＝運気が空回りしやすい時期の目印です。',
       // 大運・年運の総合ラベルの意味は運表の解説（KANTEI_REPORT_CH7_* の B列＝period summary の text1。output_report.js の E123・E124）
-      mainItems: [['大運総合ラベル', 'DECADE_SUMMARY_LABEL', 'KANTEI_REPORT_CH7_DECADE'], ['年運総合ラベル', 'YEAR_SUMMARY_LABEL', 'KANTEI_REPORT_CH7_YEAR']],
+      // 表の名前は運勢表の記号の説明（「総合の記号」）に合わせる。「ラベル」は内部の言い方なので出さない（2026-10-29 #24）
+      mainItems: [['大運の総合', 'DECADE_SUMMARY_LABEL', 'KANTEI_REPORT_CH7_DECADE'], ['年運の総合', 'YEAR_SUMMARY_LABEL', 'KANTEI_REPORT_CH7_YEAR']],
       subItems: [['位相法', 'YEAR_ISOHOU_KEY', 'KANTEI_MEANING_ISOHOU'], ['空亡', 'KUUBOU_TYPE_KEY', 'KANTEI_MEANING_KUUBOU']],
       // 第7章の本文は C列（output_report.js 393・394行）
       reports: [['大運の傾向', 'KANTEI_REPORT_CH7_DECADE', COL_C], ['年運の傾向', 'KANTEI_REPORT_CH7_YEAR', COL_C]]
@@ -176,6 +179,7 @@
   };
   var KEYWORD_SEPARATOR = '｜';
   var TIP_EDIT_KEY_PREFIX = 'WEB_TIP_CH';   // 章ごとの豆知識（WEB_TIP_CH1〜8）
+  var SUMMARY_HEADING = 'あなたの傾向';   // 章の要約の見出し（章ごとに summaryHeading で替えられる。第7章は「いまの流れ」）
   var BASIS_HEADING = '鑑定の根拠';
   // 用語ミニ辞典：一般的な読み方の目安。見出しの行（■）と「用語：意味」の行（用語を太字）。2026-10-27 ガクさん確認済み
   var GLOSSARY = {
@@ -395,11 +399,12 @@
    */
   function buildChapterSection(chapter, index) {
     var source = CHAPTERS[index];
+    var summaryHeading = source.summaryHeading || SUMMARY_HEADING;
     // 要の一文（あなたの傾向）は章の色の線を左に付けた枠で目立たせる（段階3：案8）
     var parts = [
       { type: 'boxStart', className: 'report-key', tone: 'key', color: source.icon.color },
-      buildHeading(4, 'あなたの傾向'),
-      buildEditableLines(chapter.summary, source.summaryKey, chapter.title + '／あなたの傾向'),
+      buildHeading(4, summaryHeading),
+      buildEditableLines(chapter.summary, source.summaryKey, chapter.title + '／' + summaryHeading),
       { type: 'boxEnd' },
       buildHeading(4, '鑑定結果')
     ];
