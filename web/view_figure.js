@@ -29,6 +29,9 @@
   var COLOR_LINE = '#d1d9e0';
   var COLOR_BG = '#ffffff';
   var DAY_PILLAR_NOTE = 'あなた自身';
+  // 干支のない柱（出生時刻が不明の時柱）：白い「-」の枠が不具合に見えたので、点線の枠に断りを書く（REVIEW A-12）
+  var UNUSED_PILLAR_LINES = ['時刻不明のため', '使っていません'];
+  var UNUSED_DASH = [5, 4];
 
   // 五行の色（濃い色＝棒・字、薄い色＝柱の文字の地）
   var GOGYO_ORDER = ['木', '火', '土', '金', '水'];
@@ -64,6 +67,11 @@
         shapes.push({ t: 'rect', x: colWidth * i + 4, y: 0, w: colWidth - 8, h: 206, fill: 'none', stroke: ACCENT, sw: 2.5, r: 8 });
       }
       shapes.push(text(cx, 14, pillar.label, 13, { weight: 'bold', color: pillar.isDay ? ACCENT : COLOR_TEXT }));
+      if (!STEM_GOGYO[pillar.stem] && !BRANCH_GOGYO[pillar.branch]) {   // 干支がない柱：点線の枠と断りだけ
+        shapes.push({ t: 'rect', x: cx - tile / 2, y: 50, w: tile, h: 116, fill: 'none', stroke: COLOR_SUB, sw: 1.2, r: 6, dash: UNUSED_DASH });
+        UNUSED_PILLAR_LINES.forEach(function (line, k) { shapes.push(text(cx, 96 + k * 22, line, 11, { color: COLOR_SUB })); });
+        return;
+      }
       // 日柱の天干は日干（あなた自身）。通変星の代わりにそう書く
       shapes.push(pillar.isDay ? text(cx, 36, DAY_PILLAR_NOTE, 12, { weight: 'bold', color: ACCENT }) : text(cx, 36, pillar.tsuhen, 12, { color: COLOR_SUB }));
       [[pillar.stem, STEM_GOGYO, 50], [pillar.branch, BRANCH_GOGYO, 112]].forEach(function (cell) {
@@ -247,7 +255,9 @@
     if (shape.t === 'rect') {
       var styles = [svgPaint('fill', shape.fill), svgPaint('stroke', shape.stroke)];
       if (shape.opacity !== undefined) styles.push('fill-opacity: ' + shape.opacity);
-      return createSvg('rect', { x: shape.x, y: shape.y, width: shape.w, height: shape.h, rx: shape.r, 'stroke-width': shape.sw || 0, style: styles.join('; ') });
+      var rectAttributes = { x: shape.x, y: shape.y, width: shape.w, height: shape.h, rx: shape.r, 'stroke-width': shape.sw || 0, style: styles.join('; ') };
+      if (shape.dash) rectAttributes['stroke-dasharray'] = shape.dash.join(' ');   // 点線（干支のない柱）
+      return createSvg('rect', rectAttributes);
     }
     if (shape.t === 'line') {
       return createSvg('line', { x1: shape.x1, y1: shape.y1, x2: shape.x2, y2: shape.y2, 'stroke-width': shape.sw || 1, style: svgPaint('stroke', shape.stroke) });

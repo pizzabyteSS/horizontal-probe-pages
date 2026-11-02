@@ -133,6 +133,7 @@ html[data-brand-color] #outReport .result-block:not(.is-closed) > .result-block-
 .result-table.is-info td { text-align: left; }
 .result-table.is-wide { font-size: 13px; }
 .result-table.is-wide tbody th { text-align: center; }
+.result-table.is-fortune td { white-space: pre; }   /* 通変星などの欄の2行目は評価（REVIEW A-17） */
 .result-table.is-fortune td:last-child { white-space: normal; min-width: 12em; text-align: left; }
 .result-table.is-report td { white-space: pre-wrap; text-align: left; }
 .result-table.is-report td:last-child { min-width: 12em; }
@@ -248,6 +249,7 @@ html[data-brand-color] #outReport .result-block:not(.is-closed) > .result-block-
   .fortune-group:has(.result-group-title.is-all-closed) { display: none; }
   .result-table { font-size: 11pt; width: 100%; }
   .result-table th, .result-table td { white-space: normal; padding: 3px 5px; }
+  .result-table.is-fortune td { white-space: pre-line; }   /* 評価の2行目は印刷でも改行（REVIEW A-17） */
   .result-table thead th, .result-box, .section-icon { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
   .edit-note, .edit-controls, .edit-original, .edit-input, .edit-empty { display: none !important; }    /* 書き直した後の文だけを出す（空にした文の知らせも出さない） */
   .edit-block.is-editing > .edit-current { display: block; }

@@ -108,10 +108,10 @@
     {
       title: '第6章｜健康運と心身の傾向', summaryKey: 'KANTEI_SUMMARY_CH6', icon: { name: 'leaf', color: '#4c8f46' },
       figures: ['gogyo'],
-      tip: '五行バランス＝木・火・土・金・水の5つの要素の偏り。多い・少ない要素が、心身の傾向にも表れるとされます。',
+      tip: '五行バランス＝木・火・土・金・水の5つの要素の偏り。多い・少ない要素が、心身の傾向にも表れるとされます。この章は命式から見た心身の傾向で、医療の診断や治療の代わりではありません。',
       mainItems: [['五行バランス', 'BIAS_TYPE_KEY', 'KANTEI_MEANING_BIAS'], ['日干強弱', 'STR_LABEL_KEY', 'KANTEI_MEANING_STRENGTH']],
-      // 十二運（表）は 12行「十二運」の D列（日柱）をそのまま出す（output_report.js 376行）
-      subItems: [['十二運（表）', '十二運', 'KANTEI_MEANING_JUNIUN', COL_D], ['通変星分布', 'DIST_CORE_KEY', 'KANTEI_MEANING_DIST_CORE']],
+      // 十二運（日柱）は 12行「十二運」の D列（日柱）をそのまま出す（output_report.js 376行）。「（表）」は内部の言い方なので出さない（PR-文①）
+      subItems: [['十二運（日柱）', '十二運', 'KANTEI_MEANING_JUNIUN', COL_D], ['通変星分布', 'DIST_CORE_KEY', 'KANTEI_MEANING_DIST_CORE']],
       reports: [['心身の傾向', 'KANTEI_REPORT_CH6_HEALTH']]
     },
     {
@@ -119,11 +119,14 @@
       // 要約は人の性質でなく時期の説明なので、見出しを「あなたの傾向」から替える（2026-10-29 #24）
       summaryHeading: 'いまの流れ',
       figures: ['decade', 'nenun'], markLegend: true,
-      tip: '大運＝10年ごとの運気の流れ。年運＝1年ごとの運気。位相法＝その年の干支と命式の組み合わせ、空亡＝運気が空回りしやすい時期の目印です。',
+      tip: '大運＝10年ごとの運気の流れ。年運＝1年ごとの運気。日支との関係＝今年の干支とあなたの日支（生まれた日の十二支）の組み合わせ（位相法のうち日支との関係）。空亡＝生まれた日の干支から決まる2つの十二支の型で、その十二支が巡る時期を天中殺と呼びます。',
       // 大運・年運の総合ラベルの意味は運表の解説（KANTEI_REPORT_CH7_* の B列＝period summary の text1。output_report.js の E123・E124）
       // 表の名前は運勢表の記号の説明（「総合の記号」）に合わせる。「ラベル」は内部の言い方なので出さない（2026-10-29 #24）
       mainItems: [['大運の総合', 'DECADE_SUMMARY_LABEL', 'KANTEI_REPORT_CH7_DECADE'], ['年運の総合', 'YEAR_SUMMARY_LABEL', 'KANTEI_REPORT_CH7_YEAR']],
-      subItems: [['位相法', 'YEAR_ISOHOU_KEY', 'KANTEI_MEANING_ISOHOU'], ['空亡', 'KUUBOU_TYPE_KEY', 'KANTEI_MEANING_KUUBOU']],
+      // 運気の点数は用神・喜神で決まるので、根拠に用神を出す（第3章・第5章と同じ行。案イ、2026-11-02）
+      // 今年の位相法の評価は日支との関係だけで決める（api_master.js _isohouCode_）ので、名前もそう書く（PR-文①）
+      subItems: [['日支との関係', 'YEAR_ISOHOU_KEY', 'KANTEI_MEANING_ISOHOU'], ['空亡', 'KUUBOU_TYPE_KEY', 'KANTEI_MEANING_KUUBOU'],
+        ['用神候補', 'YOJIN_PRIMARY_KEY', 'KANTEI_MEANING_YOJIN']],
       // 第7章の本文は C列（output_report.js 393・394行）
       reports: [['大運の傾向', 'KANTEI_REPORT_CH7_DECADE', COL_C], ['年運の傾向', 'KANTEI_REPORT_CH7_YEAR', COL_C]]
     },
@@ -216,12 +219,12 @@
         ['十二運の「死」', '命が終わるという意味ではなく、勢いが静まり、内面が深まる段階。落ち着いて物事を見極める力'],
         ['蔵干', '地支の中に隠れている天干。内面や隠れた資質'],
         ['身強弱', '日干のエネルギーの強さ。強いほど自力型、弱いほど周りの力を活かす型'],
-        ['用神・喜神', '命式の強弱と五行の偏りから選ぶ、バランスを整える五行。用神が第一、喜神が第二'],
+        ['用神・喜神', '命式の強弱と五行の偏りから選ぶ、バランスを整える五行が用神。用神を助ける五行が喜神'],
         ['守護神', '日干と生まれ月の組み合わせから選ぶ、命式を助ける天干。用神とは選び方が違う'],
         ['財星', 'お金や財に関わる通変星（偏財・正財）'],
         ['大運・年運・月運・日運', '10年・1年・1か月・1日ごとの運気の流れ'],
         ['位相法', '干支どうしの組み合わせ（合・冲・刑・害・破）から、出来事の起こりやすさを見る'],
-        ['空亡（天中殺）', '運気が空回りしやすい時期の目印'],
+        ['空亡・天中殺', '空亡は、生まれた日の干支から決まる2つの十二支の型。その十二支が巡る年・月・日を天中殺と呼び、物事が空回りしやすい時期の目印とする'],
         ['宿命中殺', '生まれつき命式の中に空亡の地支があること（生年中殺・生月中殺・生日中殺）。その柱が表すことに、独特の出方をしやすい目印']
       ]]
     ]
@@ -272,6 +275,13 @@
       ['天中殺の過ごし方', 'KANTEI_REPORT_CH8_TENCHU'], ['エネルギーを整える習慣', 'KANTEI_REPORT_CH8_ENERGY']
     ]
   };
+  // しめくくり「おわりに」：鑑定書の最後の結びの文（REVIEW A-16。2026-11-02）。書き直せる・字数に数えない（Web 版だけの文）
+  var CLOSING = {
+    key: 'report.closing', title: 'おわりに', editKey: 'WEB_CLOSING',
+    text: 'この鑑定書は、生まれた日時から出した命式をもとに、持ち味と運気の流れをまとめたものです。' +
+      '運気の良し悪しは未来を決めつけるものではなく、流れを知って上手に使うための目印です。' +
+      '迷ったときや節目には、この鑑定書を読み返してみてください。これからの毎日が、より実りあるものになりますように。'
+  };
   // 第8章「天中殺の過ごし方」の本文の前に置く、計算で出す1行（書き直さない・字数に数えない。2026-10-28 ガクさん承認）。
   //   空亡の2支（KUUBOU_TYPE_KEY）と鑑定開始年から、今が天中殺か・次はいつかを書く。年の区切りは立春（四柱推命の年）
   var TENCHU_REPORT_KEY = 'KANTEI_REPORT_CH8_TENCHU';
@@ -282,19 +292,26 @@
   function branchOfYear(year) { return ((year - 4) % 12 + 12) % 12; }
 
   // 天中殺の年の1行の後ろに添える、月・日の天中殺の説明（2026-10-28 ガクさん承認）
-  var TENCHU_MONTH_DAY_TEXT = '月運表・日運表の空亡の欄に「天中殺」とある月・日も、同じく空回りしやすい時期の目印です（総合の記号は運気の点数どおりに付けています）。';
+  var TENCHU_MONTH_DAY_TEXT = '月運表・日運表の空亡の欄に「天中殺」とある月・日も、同じく空回りしやすい時期の目印です（総合の記号は一段下げて付けています）。';
 
-  /** 天中殺の年の1行（空亡か年が読めなければ ''）。 */
-  function buildTenchuYearText(kuubouKey, startYear) {
+  /** いまの大運が天中殺の十二支に当たるときの1文（PR-文①。当たらなければ ''）。taiun は VIEW.readCurrentTaiun の値。 */
+  function buildTenchuDecadeText(taiun) {
+    if (!taiun || !taiun.isTenchu) return '';
+    return 'いまの大運（' + taiun.ageRange + '）の地支' + taiun.branch + 'も天中殺の十二支にあたるため、この10年は新しく広げるより、土台の見直しを意識すると過ごしやすくなります。';
+  }
+
+  /** 天中殺の年の1行（空亡か年が読めなければ ''）。taiun（省略可）はいまの大運（大運が天中殺なら1文を足す）。 */
+  function buildTenchuYearText(kuubouKey, startYear, taiun) {
     var pair = Object.prototype.hasOwnProperty.call(KUUBOU_BRANCHES, kuubouKey) ? KUUBOU_BRANCHES[kuubouKey] : null;
     var year = parseInt(startYear, 10);
     if (!pair || isNaN(year)) return '';
     var head = 'あなたの天中殺は' + BRANCH_CHARS.charAt(pair[0]) + '年・' + BRANCH_CHARS.charAt(pair[1]) + '年です（年の区切りは立春）。';
+    var tail = buildTenchuDecadeText(taiun) + TENCHU_MONTH_DAY_TEXT;
     var branch = branchOfYear(year);
-    if (branch === pair[0]) return head + '今年（' + year + '年）から' + (year + 1) + '年までの2年間がその時期にあたります。' + TENCHU_MONTH_DAY_TEXT;
-    if (branch === pair[1]) return head + '今年（' + year + '年）は天中殺の2年目にあたります。' + TENCHU_MONTH_DAY_TEXT;
+    if (branch === pair[0]) return head + '今年（' + year + '年）から' + (year + 1) + '年までの2年間がその時期にあたります。' + tail;
+    if (branch === pair[1]) return head + '今年（' + year + '年）は天中殺の2年目にあたります。' + tail;
     var first = year + (pair[0] - branch + 12) % 12;
-    return head + '次は' + first + '〜' + (first + 1) + '年で、今年（' + year + '年）は該当しません。' + TENCHU_MONTH_DAY_TEXT;
+    return head + '次は' + first + '〜' + (first + 1) + '年で、今年（' + year + '年）は該当しません。' + tail;
   }
 
   /** 文の1文目（「。」まで。なければ全文）。 */
@@ -349,7 +366,8 @@
   /** 鑑定書の中身（画面に書く前の形）。試験と段階3 の PDF でも同じものを使えるように分けておく。 */
   function buildReport(table) {
     var keyMap = table.buildKeyMap();
-    var tenchuYear = buildTenchuYearText(readKeyValue(keyMap, 'KUUBOU_TYPE_KEY'), VIEW.readStartYearFortune(table).year);
+    var tenchuYear = buildTenchuYearText(readKeyValue(keyMap, 'KUUBOU_TYPE_KEY'), VIEW.readStartYearFortune(table).year,
+      VIEW.readCurrentTaiun(table));
     return CHAPTERS.map(function (chapter) {
       return {
         title: chapter.title, tenchuYear: tenchuYear,
@@ -497,12 +515,23 @@
     return { key: TODAY.key, title: TODAY.title, closable: true, className: 'report-extra report-today', parts: parts };
   }
 
-  /** 鑑定書の項目：ひと目でわかるあなた → 8章 → 用語ミニ辞典 → 今日からできること。鑑定情報は含めない。 */
+  /** しめくくり「おわりに」（1つの書き直せる文。字数に数えない）。 */
+  function buildClosingSection() {
+    return {
+      key: CLOSING.key, title: CLOSING.title, closable: true, className: 'report-extra report-closing',
+      parts: [buildEditableLines(CLOSING.text, CLOSING.editKey, CLOSING.title, { isExtra: true })]
+    };
+  }
+
+  /**
+   * 鑑定書の項目：ひと目でわかるあなた → 8章 → 今日からできること → おわりに → 用語ミニ辞典（辞典は巻末。「今日からできること」は第8章の直後。REVIEW A-15・A-16）。
+   * 鑑定情報は含めない。PDF では用語ミニ辞典を命式・運勢表のあとの最後に置く（pdf_document.js）
+   */
   function buildReportSections(table) {
     var chapters = buildReport(table);
     return [buildGlanceSection(table, chapters)]
       .concat(chapters.map(buildChapterSection))
-      .concat([buildGlossarySection(table), buildTodaySection(table)]);
+      .concat([buildTodaySection(table), buildClosingSection(), buildGlossarySection(table)]);
   }
 
   /** 鑑定書を container に書く。name は送った時点の氏名。 */
@@ -512,6 +541,8 @@
 
   VIEW.REPORT_GLANCE_KEY = GLANCE.key;
   VIEW.REPORT_TODAY_KEY = TODAY.key;
+  VIEW.REPORT_GLOSSARY_KEY = GLOSSARY.key;
+  VIEW.REPORT_CLOSING_KEY = CLOSING.key;
   VIEW.buildReport = buildReport;
   VIEW.buildReportSections = buildReportSections;
   VIEW.renderReport = renderReport;

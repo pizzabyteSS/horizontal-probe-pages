@@ -63,6 +63,13 @@
     var plotHeight = item.h - CHART_TITLE_HEIGHT - CHART_TOP_PAD - bottom;
     var toX = function (i) { return plotLeft + gap * (i + 0.5); };
     var toY = function (v) { return plotTop + plotHeight * (AXIS_MAX - clampToAxis(v)) / (AXIS_MAX - AXIS_MIN); };
+    if (points.length > VIEW.CHART_THIN_FROM) step = Math.max(step, VIEW.CHART_THIN_STEP);   // 日運など点が多いときは日付の目盛りを間引く
+
+    // 総合の記号の境目（60以上＝◎○、39以下＝注）の帯。線・点より先に塗る（REVIEW A-14）
+    VIEW.CHART_BANDS.forEach(function (band) {
+      ctx.fillStyle = band.fill;
+      ctx.fillRect(plotLeft, toY(band.to), plotWidth, toY(band.from) - toY(band.to));
+    });
 
     ctx.strokeStyle = CHART_GRID_COLOR;
     ctx.lineWidth = 1;
@@ -154,7 +161,9 @@
         if (shape.stroke && shape.stroke !== 'none' && shape.sw) {
           ctx.strokeStyle = resolveFigureColor(shape.stroke, item.accent);
           ctx.lineWidth = shape.sw;
+          if (shape.dash) ctx.setLineDash(shape.dash);   // 点線（干支のない柱。view_figure.js）
           ctx.stroke();
+          ctx.setLineDash([]);
         }
       } else if (shape.t === 'line') {
         ctx.strokeStyle = resolveFigureColor(shape.stroke, item.accent);
@@ -212,11 +221,13 @@
         ctx.strokeRect(item.x + 0.5, item.y + 0.5, item.w, item.h);
       } else if (item.kind === 'line') {
         ctx.strokeStyle = item.color;
-        ctx.lineWidth = 1;
+        ctx.lineWidth = item.dash ? 2 : 1;
+        if (item.dash) ctx.setLineDash(item.dash);   // 点線（目次の名前とページ番号の間。REVIEW A-16）
         ctx.beginPath();
         ctx.moveTo(item.x1, item.y1 + 0.5);
         ctx.lineTo(item.x2, item.y2 + 0.5);
         ctx.stroke();
+        if (item.dash) ctx.setLineDash([]);
       } else if (item.kind === 'chart') {
         drawChart(ctx, item);
       } else if (item.kind === 'figure') {

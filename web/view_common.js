@@ -104,20 +104,22 @@
   var BIRTH_TIME_UNKNOWN = '不明';
   var BIRTH_TIME_UNKNOWN_NOTE = '出生時刻が不明のため、時柱を使わずに計算しています。時刻が分かると日干の強さ・タイプ・鑑定文が変わることがあります。';
 
-  /** 鑑定情報の項目（閉じられない。docs/product-spec.md §4.2：鑑定日と計算に使った入力を必ず載せる）。出生時刻が不明なら断りを添える。 */
+  /**
+   * 鑑定情報の項目（閉じられない。docs/product-spec.md §4.2：鑑定日と計算に使った入力を必ず載せる）。出生時刻が不明なら断りを添える。
+   * 氏名は計算に使わない任意の入力なので、空なら行ごと出さない（「-」が不具合に見えた。REVIEW A-11）
+   */
   function buildInfoSection(info) {
+    var rows = [['鑑定日', info.kanteiDate]];
+    if (!VIEW.isBlank(info.name) && info.name !== '-') rows.push(['氏名', info.name]);
+    rows = rows.concat([
+      ['性別', info.sex],
+      ['生年月日', info.birthDate],
+      ['出生時刻', info.birthTime],
+      ['出生地', info.birthPlace],
+      ['流派', info.style]
+    ]);
     var section = {
-      key: INFO_SECTION_KEY, title: '鑑定情報', closable: false, parts: [{
-        type: 'table', headers: null, className: 'is-info', rows: [
-          ['鑑定日', info.kanteiDate],
-          ['氏名', info.name],
-          ['性別', info.sex],
-          ['生年月日', info.birthDate],
-          ['出生時刻', info.birthTime],
-          ['出生地', info.birthPlace],
-          ['流派', info.style]
-        ]
-      }]
+      key: INFO_SECTION_KEY, title: '鑑定情報', closable: false, parts: [{ type: 'table', headers: null, className: 'is-info', rows: rows }]
     };
     if (info.birthTime === BIRTH_TIME_UNKNOWN) {
       section.parts.push({ type: 'lines', text: BIRTH_TIME_UNKNOWN_NOTE, className: 'result-text report-tip', tone: 'tip' });
@@ -310,6 +312,11 @@
   VIEW.appendLines = appendLines;
   VIEW.readCommonInfo = readCommonInfo;
   VIEW.appendCommonInfo = appendCommonInfo;
+  // 折れ線グラフの帯（総合の記号の境目：運気60以上＝◎○の範囲、39以下＝注の範囲。view_fortune.js の SUMMARY_MARK_LEGEND。REVIEW A-14）。
+  //   画面（view_chart.js）と PDF（pdf_draw.js）の両方が使う
+  VIEW.CHART_BANDS = [{ from: 60, to: 100, fill: '#eef6f0' }, { from: 0, to: 40, fill: '#fbf0ec' }];
+  VIEW.CHART_THIN_FROM = 16;   // 点がこの数より多いグラフ（日運）は横軸の文字を間引く
+  VIEW.CHART_THIN_STEP = 5;    // 間引くときの間隔（1日・6日・11日…）
   VIEW.buildInfoSection = buildInfoSection;
   VIEW.isWideTable = isWideTable;
   VIEW.buildWideRecords = buildWideRecords;

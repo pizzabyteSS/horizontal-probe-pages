@@ -62,6 +62,13 @@
     table: { size: 22, weight: 'normal', color: '#1f2328' },
     tableHead: { size: 22, weight: 'bold', color: '#1f2328' },
     page: { size: 20, weight: 'normal', color: '#59636e' },
+    // 表紙・資料編の扉（REVIEW A-16）
+    coverTitle: { size: 72, weight: 'bold', color: '#1f2328' },
+    coverName: { size: 36, weight: 'normal', color: '#1f2328' },
+    dividerTitle: { size: 60, weight: 'bold', color: '#1f2328' },
+    dividerSub: { size: 32, weight: 'normal', color: '#59636e' },
+    tableCompact: { size: 19, weight: 'normal', color: '#59636e' },        // 表紙の鑑定情報（下に小さく）
+    tableCompactHead: { size: 19, weight: 'bold', color: '#59636e' },
     note: { size: 20, weight: 'normal', color: '#59636e', before: 40, after: 0 }
   };
   var CELL_PADDING = 10;
@@ -83,12 +90,28 @@
   var BOX_PAD = 16;           // 枠の上下の内側の余白
   var BOX_AFTER = 16;         // 枠の下の余白
   var BOX_CELL_FILL = '#ffffff';   // 枠の中の表の値のセル（塗りなしだと枠の色が透けて読みにくい）
+  // 改ページ（REVIEW A-10。2026-11-02）
+  var BOX_KEEP_RATIO = 0.5;        // 枠の全体がページの高さのこの割合までなら、途中で切らずに次のページへ送る
+  var MIN_TABLE_TAIL_ROWS = 3;     // 表の終わりの行だけが次のページへ行くときは、最低この行数をまとめて送る
+  var TEXT_COLUMN_MIN_RATIO = 0.4; // 表の解説の列（textColumn）が先に取る幅（本文の幅に対する割合。REVIEW A-17）
+  // 表の値（REVIEW A-13）：数字は右に寄せ、該当なしの「-」は空欄にする（見出しの列は今までどおり）
+  var NUMERIC_CELL = /^[+\-−]?\d+(?:\.\d+)?(?:点|歳|%|％)?$/;
+  var EMPTY_CELL = '-';
   // 要の一文の枠（tone 'key'。段階3）：薄い地に、左へ章の色の線
   var KEY_BOX_FILL = '#fafbfc';
   var KEY_BOX_STROKE = '#e6e1d6';
   var KEY_BAR_WIDTH = 8;
   var ICON_GAP = 14;          // 章のアイコンと見出しの字の間
   var TERM_SEPARATOR = '：';  // tone 'terms'：各行の「：」の前（用語）を太字にする（用語ミニ辞典）
+  // 表紙・目次・資料編の扉（REVIEW A-16）
+  var COVER_TOP_GAP = 24;     // 表紙の題名の上の余白
+  var COVER_AFTER = 28;       // 表紙の題名・氏名と区切り線の下の余白
+  var COVER_RULE_WIDTH = 0.4; // 表紙の区切り線の長さ（本文の幅に対する割合。真ん中に置く）
+  var TOC_INDENT = 48;        // 目次の資料編の中の項目の字下げ
+  var TOC_LEADER_GAP = 14;    // 目次の点線と字の間
+  var TOC_LEADER_DASH = [2, 8];
+  var DIVIDER_TOP_RATIO = 0.32;     // 資料編の扉の題名の高さ（本文の高さに対する割合）
+  var DIVIDER_TEXT_RATIO = 0.78;    // 資料編の扉の説明の幅（本文の幅に対する割合。段落ごと真ん中に置く）
 
   // ---- 禁則（docs/web-pdf-plan.md §4.3） ----
   var NO_LINE_START = '、。，．・：；？！ー）」』】〕〉》ぁぃぅぇぉっゃゅょゎァィゥェォッャュョヮヵヶ,.:;?!)]}';
@@ -209,16 +232,22 @@
    * 収まらなければ、広い列から同じ上限で削る（上限 c を、min(自然な幅, c) の合計が本文の幅になるように決める）。
    * contentWidth は本文の幅（ページの向きで変わる。省いたら縦）
    */
+  /** 表の字の形（compact：表紙の鑑定情報。小さめの灰色で、1列目も値の字。plainFirst）。 */
+  function tableStylesOf(table) {
+    return table && table.compact ? { body: STYLE.tableCompact, head: STYLE.tableCompactHead, plainFirst: true } : { body: STYLE.table, head: STYLE.tableHead };
+  }
+
   function computeColumnWidths(table, measure, contentWidth) {
     var available = contentWidth || GEOMETRY.portrait.contentWidth;   // 割る幅（本文の幅）
+    var styles = tableStylesOf(table);
     var count = Math.max(table.headers ? table.headers.length : 0, table.rows.reduce(function (n, row) { return Math.max(n, row.length); }, 0));
     var natural = [];
     for (var c = 0; c < count; c++) {
       var widest = 0;
-      if (table.headers) widest = measure(String(table.headers[c] || ''), formatFont(STYLE.tableHead));
+      if (table.headers) widest = measure(String(table.headers[c] || ''), formatFont(styles.head));
       table.rows.forEach(function (row) {
         String(row[c] === undefined ? '' : row[c]).split('\n').forEach(function (part) {
-          widest = Math.max(widest, measure(part, formatFont(c === 0 ? STYLE.tableHead : STYLE.table)));
+          widest = Math.max(widest, measure(part, formatFont(c === 0 && !styles.plainFirst ? styles.head : styles.body)));
         });
       });
       natural.push(Math.min(available, Math.ceil(widest) + CELL_PADDING * 2));
@@ -227,6 +256,27 @@
     if (total <= available) {
       return natural.map(function (w) { return w * available / total; });
     }
+    // 解説の列（textColumn。運勢表）は、本文の幅の TEXT_COLUMN_MIN_RATIO までは先に取り、残りをほかの列で分ける（REVIEW A-17）。
+    //   同じ上限で削ると解説が短い列と同じ幅になり、1行が7〜8行に伸びていた
+    var text = table.textColumn;
+    if (typeof text === 'number' && text >= 0 && text < count) {
+      var reserved = Math.min(natural[text], available * TEXT_COLUMN_MIN_RATIO);
+      var others = natural.filter(function (w, c) { return c !== text; });
+      var otherWidths = capWidths(others, available - reserved);
+      var used = otherWidths.reduce(function (a, b) { return a + b; }, 0);
+      var result = [];
+      for (var k = 0, o = 0; k < count; k++) result.push(k === text ? available - used : otherWidths[o++]);
+      return result;
+    }
+    var widths = capWidths(natural, available);
+    var rest = available - widths.reduce(function (a, b) { return a + b; }, 0);
+    widths[widths.length - 1] += rest;   // 端数を最後の列に足して本文の幅にそろえる
+    return widths;
+  }
+
+  /** 広い列から同じ上限で削り、合計を available 以下にする（収まるならそのまま）。 */
+  function capWidths(natural, available) {
+    if (natural.reduce(function (a, b) { return a + b; }, 0) <= available) return natural.slice();
     var low = 0;
     var high = available;
     for (var i = 0; i < 40; i++) {
@@ -234,10 +284,7 @@
       var sum = natural.reduce(function (a, w) { return a + Math.min(w, cap); }, 0);
       if (sum > available) high = cap; else low = cap;
     }
-    var widths = natural.map(function (w) { return Math.min(w, low); });
-    var rest = available - widths.reduce(function (a, b) { return a + b; }, 0);
-    widths[widths.length - 1] += rest;   // 端数を最後の列に足して本文の幅にそろえる
-    return widths;
+    return natural.map(function (w) { return Math.min(w, low); });
   }
 
   // ---- ページへの配置 ----
@@ -263,9 +310,12 @@
       if (isKey && cursor.box.color) { box.barColor = cursor.box.color; box.barWidth = KEY_BAR_WIDTH; }
       cursor.page.items.unshift(box);
     };
-    /** 新しいページ。枠の中でページが変わったら、前のページの枠を下端まで塗り、新しいページの上から枠を続ける。 */
+    /**
+     * 新しいページ。枠の中でページが変わったら、前のページの枠を中身の終わりまで塗り（下端まで塗ると中身のない灰色が残る。REVIEW A-10）、
+     * 新しいページの上から枠を続ける。
+     */
     cursor.newPage = function () {
-      if (cursor.box && cursor.page) cursor.closeBoxSegment(cursor.geo.bodyBottom);
+      if (cursor.box && cursor.page) cursor.closeBoxSegment(Math.min(cursor.y + BOX_PAD / 2, cursor.geo.bodyBottom));
       cursor.page = createPage(cursor.geo);
       cursor.pages.push(cursor.page);
       cursor.y = bodyTop;
@@ -314,13 +364,54 @@
   }
 
   /** 表の1行の形：各セルの行と、その行の高さ。 */
-  function measureTableRow(cells, widths, isHead, measure, charWidth) {
+  function measureTableRow(cells, widths, isHead, measure, charWidth, styles) {
+    var st = styles || tableStylesOf(null);
     var lines = widths.map(function (w, c) {
-      var style = isHead || c === 0 ? STYLE.tableHead : STYLE.table;
+      var style = isHead || (c === 0 && !st.plainFirst) ? st.head : st.body;
       return wrapText(cells[c] === undefined ? '' : cells[c], w - CELL_PADDING * 2, measure, formatFont(style), charWidth);
     });
     var most = lines.reduce(function (n, cellLines) { return Math.max(n, cellLines.length); }, 1);
-    return { cells: lines, lineCount: most, height: most * lineHeightOf(STYLE.table) + CELL_PADDING * 2 };
+    return { cells: lines, lineCount: most, height: most * lineHeightOf(st.body) + CELL_PADDING * 2 };
+  }
+
+  /** boxStart（index）に対応する boxEnd の添字（なければ最後の部品の次）。 */
+  function findBoxEnd(blocks, index) {
+    var depth = 0;
+    for (var i = index; i < blocks.length; i++) {
+      if (blocks[i].type === 'boxStart') depth++;
+      else if (blocks[i].type === 'boxEnd' && --depth === 0) return i;
+    }
+    return blocks.length;
+  }
+
+  /**
+   * from〜to（含まない）の部品を、ページをまたがずに置いたときの高さ（枠を次のページへ送るかの判定に使う。REVIEW A-10）。
+   * 見出しの上の余白は含める（先頭の見出しはページの頭に来ないとき付く）
+   */
+  function measureBlocksHeight(blocks, from, to, measure, charWidth, widthsCache, contentWidth) {
+    var height = 0;
+    for (var i = from; i < to; i++) {
+      var block = blocks[i];
+      if (block.type === 'title' || block.type === 'heading' || block.type === 'paragraph') {
+        var style = styleOfBlock(block);
+        height += (block.type === 'paragraph' ? 0 : style.before)
+          + wrapBlockLines(block, style, measure, charWidth, contentWidth).length * lineHeightOf(style) + style.after;
+      } else if (block.type === 'table') {
+        var widths = widthsCache(block);
+        var styles = tableStylesOf(block);
+        height += (block.headers ? measureTableRow(block.headers, widths, true, measure, charWidth, styles).height : 0) + TABLE_AFTER;
+        block.rows.forEach(function (row) { height += measureTableRow(row, widths, false, measure, charWidth, styles).height; });
+      } else if (block.type === 'chart') height += CHART_HEIGHT + CHART_AFTER;
+      else if (block.type === 'figure') height += measureFigure(block, contentWidth).h + FIGURE_AFTER;
+      else if (block.type === 'boxStart') height += BOX_PAD;
+      else if (block.type === 'boxEnd') height += BOX_AFTER;
+    }
+    return height;
+  }
+
+  /** 枠（boxStart〜boxEnd）全体の高さ。 */
+  function measureBoxHeight(blocks, index, measure, charWidth, widthsCache, contentWidth) {
+    return measureBlocksHeight(blocks, index, findBoxEnd(blocks, index), measure, charWidth, widthsCache, contentWidth);
   }
 
   /**
@@ -336,6 +427,18 @@
       var lines = wrapBlockLines(block, paragraphStyle, measure, charWidth, contentWidth);
       return Math.min(MIN_LINES_AFTER_HEADING, lines.length) * lineHeightOf(paragraphStyle);
     }
+    if (block.type === 'boxStart' && block.tone === 'key') {
+      // 要の一文の枠（章の見出しの直後の「あなたの傾向」）は枠ごと、その後ろの最初の部分と一緒に置く
+      //   （章の見出しと「あなたの傾向」だけがページの終わりに残っていた。REVIEW A-10）。枠が大きすぎるときは今までどおり
+      var keyHeight = measureBoxHeight(blocks, index, measure, charWidth, widthsCache, contentWidth);
+      if (keyHeight <= bodyHeight * BOX_KEEP_RATIO) {
+        var afterIndex = findBoxEnd(blocks, index) + 1;
+        var after = blocks[afterIndex];
+        var afterBefore = after && (after.type === 'title' || after.type === 'heading') ? styleOfBlock(after).before : 0;
+        return Math.min(bodyHeight, keyHeight + BOX_AFTER + afterBefore
+          + measureBlockStart(blocks, afterIndex, measure, charWidth, widthsCache, bodyHeight, contentWidth));
+      }
+    }
     if (block.type === 'boxStart') {   // 枠の上の余白と、枠の中の最初の部品（見出しならその上の余白も）
       var inner = blocks[index + 1];
       var innerBefore = inner && (inner.type === 'title' || inner.type === 'heading') ? styleOfBlock(inner).before : 0;
@@ -347,8 +450,9 @@
     }
     if (block.type === 'table') {
       var widths = widthsCache(block);
-      var head = block.headers ? measureTableRow(block.headers, widths, true, measure, charWidth).height : 0;
-      var first = block.rows.length ? measureTableRow(block.rows[0], widths, false, measure, charWidth).height : 0;
+      var startStyles = tableStylesOf(block);
+      var head = block.headers ? measureTableRow(block.headers, widths, true, measure, charWidth, startStyles).height : 0;
+      var first = block.rows.length ? measureTableRow(block.rows[0], widths, false, measure, charWidth, startStyles).height : 0;
       return Math.min(head + first, bodyHeight);
     }
     if (block.type === 'chart') return CHART_HEIGHT;
@@ -396,37 +500,48 @@
     var block = blocks[index];
     var style = STYLE.body;
     var bold = { size: style.size, weight: 'bold', color: style.color };
-    var lineHeight = lineHeightOf(style);
-    var lineNo = 0;
+    var entries = [];   // 行ごとの { line, term }（term は太字で描く用語。元の行の1行目だけ）
     String(block.text).split('\n').forEach(function (source) {
       var at = source.indexOf(TERM_SEPARATOR);
       var term = at > 0 ? source.slice(0, at) : '';
       var extra = term ? Math.max(0, measure(term, formatFont(bold)) - measure(term, formatFont(style))) : 0;
       wrapText(source, cursor.geo.contentWidth - extra, measure, formatFont(style), charWidth).forEach(function (line, i) {
-        if (lineHeight > cursor.remaining()) cursor.newPage();
-        var tag = { block: index, role: 'line', line: lineNo++ };
-        if (i === 0 && term && line.indexOf(term) === 0) {
-          addTextItem(cursor, CONTENT_LEFT, cursor.y, term, bold, measure, tag);
-          var rest = line.slice(term.length);
-          if (rest) addTextItem(cursor, CONTENT_LEFT + measure(term, formatFont(bold)), cursor.y, rest, style, measure, tag);
-        } else {
-          addTextItem(cursor, CONTENT_LEFT, cursor.y, line, style, measure, tag);
-        }
-        cursor.y += lineHeight;
+        entries.push({ line: line, term: i === 0 && term && line.indexOf(term) === 0 ? term : '' });
       });
     });
+    placeLines(cursor, entries.length, lineHeightOf(style), function (i) {
+      var tag = { block: index, role: 'line', line: i };
+      var entry = entries[i];
+      if (!entry.term) { addTextItem(cursor, CONTENT_LEFT, cursor.y, entry.line, style, measure, tag); return; }
+      addTextItem(cursor, CONTENT_LEFT, cursor.y, entry.term, bold, measure, tag);
+      var rest = entry.line.slice(entry.term.length);
+      if (rest) addTextItem(cursor, CONTENT_LEFT + measure(entry.term, formatFont(bold)), cursor.y, rest, style, measure, tag);
+    });
     cursor.y += style.after;
+  }
+
+  /**
+   * 段落の count 行を置く（draw(i) が cursor.y に i 行目を描く）。入らない行は次のページへ。
+   * 段落の最後の1行だけが次のページの頭に行くときは、1行前から送る（前のページに2行以上残るとき。REVIEW A-10）
+   */
+  function placeLines(cursor, count, lineHeight, draw) {
+    var onPage = 0;
+    for (var i = 0; i < count; i++) {
+      var lonelyLast = count - i === 2 && onPage >= 3 && cursor.remaining() < lineHeight * 2;
+      if (lineHeight > cursor.remaining() || lonelyLast) { cursor.newPage(); onPage = 0; }
+      draw(i);
+      cursor.y += lineHeight;
+      onPage++;
+    }
   }
 
   function placeParagraph(cursor, blocks, index, measure, charWidth) {
     var block = blocks[index];
     if (block.tone === 'terms') { placeTermParagraph(cursor, blocks, index, measure, charWidth); return; }
     var style = styleOfBlock(block);
-    var lineHeight = lineHeightOf(style);
-    wrapBlockLines(block, style, measure, charWidth, cursor.geo.contentWidth).forEach(function (line, i) {
-      if (lineHeight > cursor.remaining()) cursor.newPage();
-      addTextItem(cursor, CONTENT_LEFT, cursor.y, line, style, measure, { block: index, role: 'line', line: i });
-      cursor.y += lineHeight;
+    var lines = wrapBlockLines(block, style, measure, charWidth, cursor.geo.contentWidth);
+    placeLines(cursor, lines.length, lineHeightOf(style), function (i) {
+      addTextItem(cursor, CONTENT_LEFT, cursor.y, lines[i], style, measure, { block: index, role: 'line', line: i });
     });
     cursor.y += style.after;
   }
@@ -436,6 +551,9 @@
    */
   function placeBoxStart(cursor, blocks, index, measure, charWidth, widthsCache) {
     var need = measureBlockStart(blocks, index, measure, charWidth, widthsCache, cursor.bodyHeight, cursor.geo.contentWidth);
+    // 枠の全体がページの半分までなら、途中で切らない（「鑑定の根拠」の枠がページをまたいで切れていた。REVIEW A-10）
+    var whole = measureBoxHeight(blocks, index, measure, charWidth, widthsCache, cursor.geo.contentWidth);
+    if (whole <= cursor.bodyHeight * BOX_KEEP_RATIO) need = Math.max(need, whole);
     if (!cursor.isTop() && need > cursor.remaining()) cursor.newPage();
     cursor.box = { y: cursor.y, tone: blocks[index].tone || '', color: blocks[index].color || '' };
     cursor.y += BOX_PAD;
@@ -471,17 +589,23 @@
   }
 
   /** 表の1行（または長すぎる行の一部 fromLine〜toLine）を描く項目を足す。 */
-  function addTableRowItems(cursor, shape, widths, isHead, fromLine, toLine, measure, tag) {
-    var lineHeight = lineHeightOf(STYLE.table);
+  function addTableRowItems(cursor, shape, widths, isHead, fromLine, toLine, measure, tag, styles) {
+    var st = styles || tableStylesOf(null);
+    var lineHeight = lineHeightOf(st.body);
     var height = (toLine - fromLine) * lineHeight + CELL_PADDING * 2;
     var x = CONTENT_LEFT;
     widths.forEach(function (w, c) {
-      var fill = isHead ? TABLE_HEAD_FILL : (c === 0 ? TABLE_ROW_HEAD_FILL : (cursor.box ? BOX_CELL_FILL : null));
+      var fill = isHead ? TABLE_HEAD_FILL : (c === 0 && !st.plainFirst ? TABLE_ROW_HEAD_FILL : (cursor.box ? BOX_CELL_FILL : null));
       cursor.add({ kind: 'cell', x: x, y: cursor.y, w: w, h: height, fill: fill, stroke: TABLE_LINE_COLOR, tag: tag, isTableHead: isHead });
-      var style = isHead || c === 0 ? STYLE.tableHead : STYLE.table;
+      var style = isHead || (c === 0 && !st.plainFirst) ? st.head : st.body;
+      var isValue = !isHead && (c > 0 || !!st.plainFirst);
+      var isNumeric = isValue && shape.cells[c].length === 1 && NUMERIC_CELL.test(shape.cells[c][0]);
       shape.cells[c].slice(fromLine, toLine).forEach(function (line, i) {
-        cursor.add({ kind: 'text', x: x + CELL_PADDING, y: cursor.y + CELL_PADDING + i * lineHeight, lineHeight: lineHeight,
-          text: line, font: formatFont(style), color: style.color, width: measure(line, formatFont(style)), maxWidth: w - CELL_PADDING * 2, tag: tag, isTableHead: isHead });
+        if (isValue && line === EMPTY_CELL && shape.cells[c].length === 1) return;   // 該当なしは空欄
+        var lineWidth = measure(line, formatFont(style));
+        var lineX = isNumeric ? x + w - CELL_PADDING - lineWidth : x + CELL_PADDING;   // 数字は右に寄せる
+        cursor.add({ kind: 'text', x: lineX, y: cursor.y + CELL_PADDING + i * lineHeight, lineHeight: lineHeight,
+          text: line, font: formatFont(style), color: style.color, width: lineWidth, maxWidth: w - CELL_PADDING * 2, tag: tag, isTableHead: isHead });
       });
       x += w;
     });
@@ -491,13 +615,14 @@
   function placeTable(cursor, blocks, index, measure, charWidth, widthsCache) {
     var block = blocks[index];
     var widths = widthsCache(block);
-    var lineHeight = lineHeightOf(STYLE.table);
-    var head = block.headers ? measureTableRow(block.headers, widths, true, measure, charWidth) : null;
+    var styles = tableStylesOf(block);
+    var lineHeight = lineHeightOf(styles.body);
+    var head = block.headers ? measureTableRow(block.headers, widths, true, measure, charWidth, styles) : null;
     var headHeight = head ? head.height : 0;
     var placeHead = function () {
-      if (head) addTableRowItems(cursor, head, widths, true, 0, head.lineCount, measure, { block: index, role: 'tableHead' });
+      if (head) addTableRowItems(cursor, head, widths, true, 0, head.lineCount, measure, { block: index, role: 'tableHead' }, styles);
     };
-    var rows = block.rows.map(function (row) { return measureTableRow(row, widths, false, measure, charWidth); });
+    var rows = block.rows.map(function (row) { return measureTableRow(row, widths, false, measure, charWidth, styles); });
     // 見出しの行と1行目が入らなければ次のページから始める。1行目がページより高いときだけ、その最初の1行ぶんで判定する
     //   （1行目を丸ごとで判定しないと、見出しの行だけがページの下に残る。下の行の置き方と同じ境目。2026-10-28）
     var firstRowNeed = !rows.length ? 0
@@ -505,13 +630,28 @@
     var firstNeed = headHeight + firstRowNeed;
     if (!cursor.isTop() && firstNeed > cursor.remaining()) cursor.newPage();
     placeHead();
+    /**
+     * このページに startRow から置くとき、表の終わりの1〜2行だけが次のページへ行くなら、手前で切る行（なければ -1）。
+     * 前のページにも MIN_TABLE_TAIL_ROWS 行以上残るときだけ（1行ずつの細切れにしない。REVIEW A-10）
+     */
+    var planTailBreak = function (startRow) {
+      var room = cursor.remaining();
+      var fit = 0;
+      while (startRow + fit < rows.length && rows[startRow + fit].height <= room) { room -= rows[startRow + fit].height; fit++; }
+      var tail = rows.length - startRow - fit;
+      if (tail < 1 || tail >= MIN_TABLE_TAIL_ROWS) return -1;
+      var keep = fit - (MIN_TABLE_TAIL_ROWS - tail);
+      return keep >= MIN_TABLE_TAIL_ROWS ? startRow + keep : -1;
+    };
+    var breakAt = planTailBreak(0);
+    var nextPage = function (r) { cursor.newPage(); placeHead(); breakAt = planTailBreak(r); };
     rows.forEach(function (shape, r) {
       var tag = { block: index, role: 'tableRow', row: r };
-      if (shape.height <= cursor.remaining()) { addTableRowItems(cursor, shape, widths, false, 0, shape.lineCount, measure, tag); return; }
+      if (r === breakAt) nextPage(r);
+      if (shape.height <= cursor.remaining()) { addTableRowItems(cursor, shape, widths, false, 0, shape.lineCount, measure, tag, styles); return; }
       if (shape.height <= cursor.bodyHeight - headHeight) {
-        cursor.newPage();
-        placeHead();
-        addTableRowItems(cursor, shape, widths, false, 0, shape.lineCount, measure, tag);
+        nextPage(r);
+        addTableRowItems(cursor, shape, widths, false, 0, shape.lineCount, measure, tag, styles);
         return;
       }
       // 1行がページより高いときだけ、セルの中を行の単位で分ける
@@ -520,7 +660,7 @@
         var fit = Math.floor((cursor.remaining() - CELL_PADDING * 2) / lineHeight);
         if (fit < 1) { cursor.newPage(); placeHead(); continue; }
         var to = Math.min(shape.lineCount, from + fit);
-        addTableRowItems(cursor, shape, widths, false, from, to, measure, { block: index, role: 'tableRow', row: r, part: from });
+        addTableRowItems(cursor, shape, widths, false, from, to, measure, { block: index, role: 'tableRow', row: r, part: from }, styles);
         from = to;
         if (from < shape.lineCount) { cursor.newPage(); placeHead(); }
       }
@@ -539,11 +679,13 @@
   }
 
   /** 図の形と、本文の幅に広げた大きさ（view_figure.js の layoutFigure を PDF 用の幅で組み、scale 倍で描く）。 */
+  //   widthRatio（省いたら 1）：本文の幅に対する図の幅（表紙の命式の図。真ん中に置く。REVIEW A-16）
   function measureFigure(block, contentWidth) {
     var shape = VIEW.layoutFigure(block.figure, VIEW.FIGURE_PDF_DESIGN_WIDTH);
-    if (!shape) return { shape: null, h: 0, scale: 1 };
-    var scale = contentWidth / shape.width;
-    return { shape: shape, h: Math.ceil(shape.height * scale), scale: scale };
+    if (!shape) return { shape: null, h: 0, w: 0, scale: 1 };
+    var width = contentWidth * (block.widthRatio || 1);
+    var scale = width / shape.width;
+    return { shape: shape, h: Math.ceil(shape.height * scale), w: width, scale: scale };
   }
 
   /** 図は1ページに収める（入らなければ次のページへ）。 */
@@ -551,9 +693,107 @@
     var figure = measureFigure(blocks[index], cursor.geo.contentWidth);
     if (!figure.shape) return;
     if (!cursor.isTop() && figure.h > cursor.remaining()) cursor.newPage();
-    cursor.add({ kind: 'figure', x: CONTENT_LEFT, y: cursor.y, w: cursor.geo.contentWidth, h: figure.h, scale: figure.scale,
+    cursor.add({ kind: 'figure', x: CONTENT_LEFT + (cursor.geo.contentWidth - figure.w) / 2, y: cursor.y, w: figure.w, h: figure.h, scale: figure.scale,
       shapes: figure.shape.shapes, accent: VIEW.FIGURE_ACCENT_DEFAULT, tag: { block: index, role: 'figure' } });
     cursor.y += figure.h + FIGURE_AFTER;
+  }
+
+  /** 1行を真ん中にそろえて置く（字が本文の幅より長ければ「…」で縮める）。 */
+  function addCenteredLine(cursor, text, style, measure, tag) {
+    var font = formatFont(style);
+    var line = fitText(text, cursor.geo.contentWidth, measure, font);
+    var width = measure(line, font);
+    cursor.add({ kind: 'text', x: CONTENT_LEFT + (cursor.geo.contentWidth - width) / 2, y: cursor.y, lineHeight: lineHeightOf(style),
+      text: line, font: font, color: style.color, width: width, tag: tag });
+    cursor.y += lineHeightOf(style);
+  }
+
+  /** 表紙の題名と氏名（部品 cover。真ん中にそろえ、下に短い区切り線）。題名（role 'pageTitle'）は屋号の色にする（applyBrandColor）。 */
+  function placeCover(cursor, blocks, index, measure) {
+    var block = blocks[index];
+    cursor.y += COVER_TOP_GAP;
+    addCenteredLine(cursor, block.title, STYLE.coverTitle, measure, { block: index, role: 'pageTitle' });
+    if (block.name) addCenteredLine(cursor, block.name + ' 様', STYLE.coverName, measure, { block: index, role: 'line', part: 'name' });
+    cursor.y += COVER_AFTER / 2;
+    var ruleWidth = cursor.geo.contentWidth * COVER_RULE_WIDTH;
+    var x1 = CONTENT_LEFT + (cursor.geo.contentWidth - ruleWidth) / 2;
+    cursor.add({ kind: 'line', x1: x1, y1: cursor.y, x2: x1 + ruleWidth, y2: cursor.y, y: cursor.y, h: 1, color: TABLE_LINE_COLOR,
+      tag: { block: index, role: 'rule', part: 'cover' } });
+    cursor.y += COVER_AFTER;
+  }
+
+  /**
+   * 目次（部品 toc）：題名と、項目ごとに「名前 ……… ページ」の1行。ページ番号と点線は、全体をページに割ったあとに
+   * fillTocNumbers が入れる（項目の行数は番号によらないので、1回割るだけで済む）
+   */
+  function placeToc(cursor, blocks, index, measure) {
+    var block = blocks[index];
+    var titleStyle = STYLE.title;
+    addTextItem(cursor, CONTENT_LEFT, cursor.y, block.title, titleStyle, measure, { block: index, role: 'pageTitle' });
+    cursor.y += lineHeightOf(titleStyle) + titleStyle.after + STYLE.heading1.after;
+    var style = STYLE.body;
+    var lineHeight = lineHeightOf(style) + style.after;
+    block.entries.forEach(function (entry, i) {
+      if (lineHeight > cursor.remaining()) cursor.newPage();
+      var x = CONTENT_LEFT + (entry.indent ? TOC_INDENT : 0);
+      var font = formatFont(style);
+      var label = fitText(entry.text, cursor.geo.contentWidth * 0.8 - (x - CONTENT_LEFT), measure, font);
+      addTextItem(cursor, x, cursor.y, label, style, measure, { block: index, role: 'tocLabel', entry: i });
+      cursor.add({ kind: 'text', x: CONTENT_LEFT + cursor.geo.contentWidth, y: cursor.y, lineHeight: lineHeightOf(style), text: '',
+        font: font, color: style.color, width: 0, tag: { block: index, role: 'tocNumber', entry: i, target: entry.target } });
+      cursor.y += lineHeight;
+    });
+  }
+
+  /** 目次のページ番号（その項目が最初に置かれたページ。下の n / N と同じ数え方）と、名前と番号の間の点線を入れる。 */
+  function fillTocNumbers(pages, measure) {
+    var pageOf = {};
+    pages.forEach(function (page, p) {
+      page.items.forEach(function (item) {
+        if (item.tag && item.tag.block !== undefined && item.tag.role !== 'tocNumber' && item.tag.role !== 'tocLabel'
+          && !Object.prototype.hasOwnProperty.call(pageOf, item.tag.block)) pageOf[item.tag.block] = p;
+      });
+    });
+    pages.forEach(function (page) {
+      var labels = {};
+      page.items.forEach(function (item) { if (item.tag && item.tag.role === 'tocLabel') labels[item.tag.entry] = item; });
+      page.items.slice().forEach(function (item) {
+        if (!item.tag || item.tag.role !== 'tocNumber') return;
+        if (!Object.prototype.hasOwnProperty.call(pageOf, item.tag.target)) return;   // 置かれなかった項目（ないはず）は番号なし
+        var right = item.x;
+        item.text = String(pageOf[item.tag.target] + 1);
+        item.width = measure(item.text, item.font);
+        item.x = right - item.width;
+        var label = labels[item.tag.entry];
+        if (!label) return;
+        var midY = item.y + item.lineHeight * 0.62;
+        var x1 = label.x + label.width + TOC_LEADER_GAP;
+        var x2 = item.x - TOC_LEADER_GAP;
+        if (x2 > x1) page.items.push({ kind: 'line', x1: x1, y1: midY, x2: x2, y2: midY, y: midY, h: 1, color: STYLE.page.color, dash: TOC_LEADER_DASH,
+          tag: { block: item.tag.block, role: 'tocLeader', entry: item.tag.entry } });
+      });
+    });
+  }
+
+  /**
+   * 資料編の扉（部品 divider。ページの上から少し下に、題名・副題・説明を真ん中にそろえて置く）。
+   * 前後の改ページは pdf_document.js が入れる
+   */
+  function placeDivider(cursor, blocks, index, measure, charWidth) {
+    var block = blocks[index];
+    if (!cursor.isTop()) cursor.newPage();
+    cursor.y += Math.round(cursor.bodyHeight * DIVIDER_TOP_RATIO);
+    addCenteredLine(cursor, block.title, STYLE.dividerTitle, measure, { block: index, role: 'pageTitle' });
+    if (block.subtitle) addCenteredLine(cursor, block.subtitle, STYLE.dividerSub, measure, { block: index, role: 'line', part: 'subtitle' });
+    cursor.y += COVER_AFTER;
+    // 説明は左にそろえた段落のまま、段落ごと真ん中に置く（行ごとに真ん中にそろえると最後の行だけずれて見える）
+    var style = STYLE.body;
+    var textWidth = cursor.geo.contentWidth * DIVIDER_TEXT_RATIO;
+    var x = CONTENT_LEFT + (cursor.geo.contentWidth - textWidth) / 2;
+    wrapText(block.text || '', textWidth, measure, formatFont(style), charWidth).forEach(function (line, i) {
+      addTextItem(cursor, x, cursor.y, line, style, measure, { block: index, role: 'line', line: i });
+      cursor.y += lineHeightOf(style);
+    });
   }
 
   /** ロゴを描く大きさ（高さ LOGO_HEIGHT。横に長すぎれば幅の上限に合わせて縮める）。 */
@@ -611,6 +851,8 @@
           if (item.kind === 'cell') { item.fill = color; item.stroke = color; } else if (item.kind === 'text') item.color = TABLE_HEAD_BRAND_TEXT;
           return;
         }
+        // 表紙・資料編の扉・目次の題名も色で（REVIEW A-16）
+        if (item.tag && item.tag.role === 'pageTitle') { item.color = color; return; }
         if (!item.tag || item.tag.role !== 'heading') return;
         var block = blocks[item.tag.block];
         if (block.type === 'title' || (block.level || 1) === 1) item.color = color;
@@ -627,6 +869,9 @@
    *       { type: 'boxStart' } … { type: 'boxEnd' }（間の部品を薄い色の枠で囲む。ページをまたげばページごとに塗る）。
    *       段落の tone：'tip'（小さめの灰色）・'lead'（大きめの太字）・'terms'（各行の「：」の前を太字）。
    *       見出しの icon：{ name, color }（章のアイコン。1行目の字の前）。枠の tone 'key'：要の一文の枠（左に color の線）
+   *       { type: 'cover', title, name }（表紙の題名・氏名） / { type: 'toc', title, entries: [{ text, target: 部品の添字, indent }] }（目次。
+   *       ページ番号は割ったあとに入れる） / { type: 'divider', title, subtitle, text }（資料編の扉）。表の compact：小さめの字（表紙の鑑定情報）。
+   *       図の widthRatio：本文の幅に対する図の幅（真ん中に置く）。表の textColumn：幅を優先して取る列（運勢表の解説）
    *   枠は { kind: 'box', x, y, w, h, fill, stroke }（ページの項目の先頭）
    * 返す値：[{ items: [描く項目], orientation, width, height, widthPt, heightPt }]。項目の座標はページの左上が 0。
    *   ロゴは { kind: 'image' }（描くときに画像を渡す）
@@ -652,10 +897,14 @@
       else if (block.type === 'figure') placeFigure(cursor, doc.blocks, index);
       else if (block.type === 'boxStart') placeBoxStart(cursor, doc.blocks, index, measure, charWidth, widthsCache);
       else if (block.type === 'boxEnd') placeBoxEnd(cursor);
+      else if (block.type === 'cover') placeCover(cursor, doc.blocks, index, measure);
+      else if (block.type === 'toc') placeToc(cursor, doc.blocks, index, measure);
+      else if (block.type === 'divider') placeDivider(cursor, doc.blocks, index, measure, charWidth);
     });
     placeBoxEnd(cursor);   // 閉じ忘れの枠は最後で閉じる
     // 最後のページが空（ちょうど前のページで終わった）なら捨てる
     if (cursor.pages.length > 1 && !cursor.page.items.length) cursor.pages.pop();
+    fillTocNumbers(cursor.pages, measure);
     addPageFrames(cursor.pages, header, measure);
     applyBrandColor(cursor.pages, doc.blocks, header.brandColor);
     return cursor.pages;

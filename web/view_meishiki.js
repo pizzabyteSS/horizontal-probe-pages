@@ -10,7 +10,7 @@
 
   // _data の行番号（master_gss/output_data.js の DATA_ROW と、writeS02Sheet_ に直書きされた行）
   var ROW = {
-    STEM: 3, BRANCH: 4, KANSHI: 5, STEM_IDX: 6, BRANCH_IDX: 7, TSUHEN: 11, JUNIUN: 12, URA_JUNIUN: 17,
+    STEM: 3, BRANCH: 4, KANSHI: 5, STEM_IDX: 6, BRANCH_IDX: 7, TSUHEN: 11, JUNIUN: 12,
     ZOKAN: 8, ZOKAN_TSUHEN: 14,
     KUUBOU: 20, ISHIKI: 21, GOSHUGOSIN: 28,
     STAR_START: 325, STAR_COUNT: 4,
@@ -29,9 +29,11 @@
   //   身強弱のしきい値は constants.js NIKKAN_STRENGTH_THRESHOLDS（5・2）と api_master.js calcNikkanStrength_ の判定に合わせる
   var NIKKAN_RANGE_NOTE = '5段階の目安：強い 5以上／やや強い 2以上5未満／中和 −2より大きく2未満／やや弱い −5より大きく−2以下／弱い −5以下。';
   //   用神の表は calcYojin_（強弱補正＝KYOJAKU_YOJIN_SCORES、不足補正＝0〜FUSOKU_MAX）
+  //   用神の同点・喜神の決め方は calcYojin_ に合わせる（2026-11-02）
   var YOJIN_NOTE = '「強弱から見た必要度」は、日干が強ければ抑える五行に、弱ければ助ける五行に点が付きます（中和はすべて0）。'
     + '「不足の度合い」は、命式に少ない五行ほど高くなります（いちばん多い五行が0、いちばん少ない五行が3。すべて同じ数なら0）。'
-    + '合計がいちばん大きい五行が用神、次が喜神です。';
+    + '合計がいちばん大きい五行が用神です（同点なら強弱から見た必要度が高い方）。'
+    + '喜神は用神を生み出す五行です（それが日干の強弱に逆らうときは、用神が生み出す五行）。';
   //   守護神は calcGuardianGod_（日干×月支の守護神の表）。用神とは選び方が違う
   var GUARDIAN_NOTE = '守護神は、日干と生まれ月の組み合わせから選ぶ天干です。命式の強弱と五行の偏りから選ぶ用神（五行）とは、選び方が違います。';
 
@@ -90,8 +92,8 @@
       // 蔵干は節入り後日数で選んだ1干（_data の8行目・14行目。9・10・15・16行目は空。2026-10-25）
       ['蔵干'].concat(readPillarCells(table, ROW.ZOKAN)),
       ['蔵干通変星'].concat(readPillarCells(table, ROW.ZOKAN_TSUHEN)),
-      ['十二運'].concat(readPillarCells(table, ROW.JUNIUN)),
-      ['裏十二運'].concat(readPillarCells(table, ROW.URA_JUNIUN))
+      // 裏十二運は流派で定義が揺れ説明もないため出さない（2026-11-02。_data の17行目は残す）
+      ['十二運'].concat(readPillarCells(table, ROW.JUNIUN))
     ];
     for (var i = 0; i < ROW.STAR_COUNT; i++) {
       var label = VIEW.formatOrEmpty(table.get(ROW.STAR_START + i, 1)) || '特殊星';

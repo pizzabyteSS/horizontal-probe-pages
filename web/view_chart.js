@@ -45,7 +45,7 @@
 
   /**
    * 折れ線グラフを parent に足す。points は [{ label, value }]（value は数値）。点がなければ何も足さない。
-   * color は GSS 版の色。title はグラフの見出し。markIndex があればその点に縦の線と markLabel（鑑定書の年運の「今年」）
+   * color は線の色。title はグラフの見出し。markIndex があればその点に縦の線と markLabel（運勢表・鑑定書の「今」「今年」など）
    */
   function appendLineChart(parent, title, points, color, markIndex, markLabel) {
     if (!points.length) return null;
@@ -58,12 +58,16 @@
     var plotHeight = CHART_HEIGHT - PLOT_TOP - bottom;
     var toX = function (i) { return PLOT_LEFT + plotWidth * (i + 0.5) / points.length; };
     var toY = function (v) { return PLOT_TOP + plotHeight * (AXIS_MAX - clampToAxis(v)) / (AXIS_MAX - AXIS_MIN); };
+    var labelStep = points.length > VIEW.CHART_THIN_FROM ? VIEW.CHART_THIN_STEP : 1;
 
     var figure = VIEW.createElement('figure', 'chart');
     figure.appendChild(VIEW.createElement('figcaption', 'chart-title', title));
     var wrap = VIEW.createElement('div', 'chart-wrap');
     var svg = createSvg('svg', { viewBox: '0 0 ' + width + ' ' + CHART_HEIGHT, width: width, height: CHART_HEIGHT, role: 'img', 'aria-label': title });
 
+    VIEW.CHART_BANDS.forEach(function (band) {
+      svg.appendChild(createSvg('rect', { x: PLOT_LEFT, y: toY(band.to), width: plotWidth, height: toY(band.from) - toY(band.to), fill: band.fill }));
+    });
     for (var tick = AXIS_MIN; tick <= AXIS_MAX; tick += AXIS_STEP) {
       var y = toY(tick);
       svg.appendChild(createSvg('line', { x1: PLOT_LEFT, x2: width - PLOT_RIGHT, y1: y, y2: y, class: 'chart-grid' }));
@@ -84,6 +88,7 @@
       var dot = createSvg('circle', { cx: x, cy: toY(point.value), r: POINT_RADIUS, fill: color });
       dot.appendChild(createSvg('title', {}, point.label + '：' + point.value));
       svg.appendChild(dot);
+      if (i % labelStep) return;
       var labelY = PLOT_TOP + plotHeight + 16;
       var attributes = { x: x, y: labelY, class: 'chart-axis', 'text-anchor': isRotated ? 'end' : 'middle' };
       if (isRotated) attributes.transform = 'rotate(-45 ' + x + ' ' + labelY + ')';
