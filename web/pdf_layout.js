@@ -93,6 +93,7 @@
   // 改ページ（REVIEW A-10。2026-11-02）
   var BOX_KEEP_RATIO = 0.5;        // 枠の全体がページの高さのこの割合までなら、途中で切らずに次のページへ送る
   var MIN_TABLE_TAIL_ROWS = 3;     // 表の終わりの行だけが次のページへ行くときは、最低この行数をまとめて送る
+  var SECTION_KEEP_RATIO = 0.5;    // 項目（見出し1から次の見出し1の手前まで）の全体がこの割合までなら、途中で切らずに次のページへ送る（五行・用神の表と注釈。2026-11-03）
   var TEXT_COLUMN_MIN_RATIO = 0.4; // 表の解説の列（textColumn）が先に取る幅（本文の幅に対する割合。REVIEW A-17）
   // 表の値（REVIEW A-13）：数字は右に寄せ、該当なしの「-」は空欄にする（見出しの列は今までどおり）
   var NUMERIC_CELL = /^[+\-−]?\d+(?:\.\d+)?(?:点|歳|%|％)?$/;
@@ -410,6 +411,17 @@
   }
 
   /** 枠（boxStart〜boxEnd）全体の高さ。 */
+  /** 見出し1（index）の項目の終わり（含まない）。次の見出し1・題名・ページの区切り・注記などの手前まで。 */
+  function findSectionEnd(blocks, index) {
+    for (var i = index + 1; i < blocks.length; i++) {
+      var b = blocks[i];
+      if (b.type === 'heading' && (b.level || 1) === 1) return i;
+      if (b.type !== 'heading' && b.type !== 'paragraph' && b.type !== 'table' && b.type !== 'chart' && b.type !== 'figure'
+        && b.type !== 'boxStart' && b.type !== 'boxEnd') return i;
+    }
+    return blocks.length;
+  }
+
   function measureBoxHeight(blocks, index, measure, charWidth, widthsCache, contentWidth) {
     return measureBlocksHeight(blocks, index, findBoxEnd(blocks, index), measure, charWidth, widthsCache, contentWidth);
   }
@@ -474,6 +486,11 @@
     var lines = wrapBlockLines(block, style, measure, charWidth, cursor.geo.contentWidth - iconRoom);
     var before = cursor.isTop() ? 0 : style.before;
     var need = before + measureBlockStart(blocks, index, measure, charWidth, widthsCache, cursor.bodyHeight, cursor.geo.contentWidth);
+    if (!cursor.isTop() && block.keepSection) {   // 項目の見出し（pdf_document.js の buildSectionBlocks が付ける）
+      // 小さい項目（五行バランス・用神など）は、表の最後の行や注釈だけが次のページへ分かれないよう、項目ごと次のページへ送る
+      var sectionHeight = measureBlocksHeight(blocks, index, findSectionEnd(blocks, index), measure, charWidth, widthsCache, cursor.geo.contentWidth);
+      if (sectionHeight <= cursor.bodyHeight * SECTION_KEEP_RATIO && sectionHeight > cursor.remaining()) need = Math.max(need, sectionHeight);
+    }
     if (!cursor.isTop() && need > cursor.remaining()) { cursor.newPage(); before = 0; }
     cursor.y += before;
     if (block.icon) addIconItem(cursor, block.icon, CONTENT_LEFT, cursor.y, lineHeightOf(style), index);

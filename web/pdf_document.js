@@ -49,7 +49,7 @@
 
   /** 項目1つ（題名は見出し1。章のアイコンがあれば字の前に描く）。 */
   function buildSectionBlocks(section) {
-    var heading = { type: 'heading', level: 1, text: section.title };
+    var heading = { type: 'heading', level: 1, text: section.title, keepSection: true };   // 小さい項目はページをまたがせない（pdf_layout.js）
     if (section.icon) heading.icon = section.icon;
     var blocks = [heading];
     section.parts.forEach(function (part) { pushPartBlocks(blocks, part); });
@@ -88,7 +88,11 @@
       if (block.type !== 'table') return block;
       return { type: 'table', compact: true, headers: block.rows.map(function (row) { return row[0]; }), rows: [block.rows.map(function (row) { return row[1]; })] };
     });
-    return blocks.concat(info);
+    // 表紙は1ページに収める作り（ページを送らない）。項目ごと送る扱い（keepSection）は外す
+    return blocks.concat(info).map(function (block) {
+      if (block.keepSection) delete block.keepSection;
+      return block;
+    });
   }
 
   /**
