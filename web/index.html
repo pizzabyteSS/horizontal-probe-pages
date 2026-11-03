@@ -86,7 +86,7 @@
       <h3 id="ttlInput" class="card-title">入力</h3>
       <label class="field">氏名（画面の表示だけに使い、サーバーには送りません）<input id="inpName" autocomplete="off" placeholder="例 山田 花子"></label>
       <h4 class="group-title">生年月日・出生時刻</h4>
-      <p class="hint">生年は西暦（1913〜2068年）で、数字は半角でも全角でも入れられます。時刻は24時間表記（午後3時は 15時）。時刻がわからないときは「時」「分」を「不明」にします。</p>
+      <p class="hint">生年は西暦（1913〜2068年）で、数字は半角でも全角でも入れられます。時刻は24時間表記（午後3時は 15時）。時刻がわからないときは「時」「分」を「不明」にします。「分」だけわからないときも、時刻不明として計算します（時柱は出しません）。</p>
       <div class="grid">
         <label class="field">生年（西暦）<input id="inpYear" inputmode="numeric" placeholder="例 1985"></label>
         <label class="field">月<select id="inpMonth" data-range="1-12" data-unit="月"></select></label>
