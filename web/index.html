@@ -7,20 +7,22 @@
 <meta name="referrer" content="no-referrer">
 <link rel="manifest" href="manifest.json">
 <link rel="stylesheet" href="app.css">
-<title>四柱推命 Web版（試作）</title>
+<title>四柱推命と鑑定文</title>
 </head>
 <body>
 <!-- 画面の構成（docs/web-screen-plan.md §4 の「画面の構成」）：ログイン → メニュー →（鑑定する／設定）。
      1つのページの中で画面（data-screen）を1つずつ出し、ページ内の印（#menu など）で切り替える（ブラウザの戻るで行き来できる） -->
 <header class="app-bar">
   <a id="lnkMenu" class="app-bar-back" href="#menu" hidden>‹ メニュー</a>
-  <span class="app-bar-title">四柱推命 Web版</span>
+  <span class="app-bar-title">四柱推命と鑑定文</span>
   <span id="outSession" class="app-bar-status">未ログイン</span>
 </header>
 <main class="page">
 
   <!-- ログイン（ログインしていないときは、どの画面を開いてもここを出す） -->
   <section id="scrLogin" class="screen" data-screen="login" aria-labelledby="ttlLogin">
+    <!-- サービスの説明（docs/sales-page.md §0 の2行目。商品画像・販売ページと同じ文。ログイン画面にだけ出す） -->
+    <p class="login-lead">スマホで命式を自動計算。<span>全8章・約5,000字</span>の<span>鑑定文</span>を土台に、<span>自分の解釈</span>を加えて<span>編集</span>できます。</p>
     <div class="card">
       <h2 id="ttlLogin" class="card-title">ログイン</h2>
       <label class="field">ID<input id="inpLoginId" autocomplete="username" autocapitalize="off" spellcheck="false"></label>

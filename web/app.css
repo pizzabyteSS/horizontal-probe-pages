@@ -51,6 +51,8 @@ html[data-brand-color] .app-bar-title, html[data-brand-color] .app-bar-back, htm
 #scrKantei .card, .result-group-title { scroll-margin-top: 100px; }   /* 目次で移ったとき、上の帯と目次に隠れない */
 .card { background: var(--color-card); border: 1px solid var(--color-line); border-radius: 8px; padding: 10px 12px; margin: 12px 0; }
 .card-title { font-size: 16px; margin: 0 0 8px; }
+.login-lead { font-size: 15px; line-height: 1.6; margin: 16px 0 0; }   /* ログイン画面のカードの上のサービスの説明 */
+.login-lead span { white-space: nowrap; }   /* 「約5,000字」「鑑定文」などを語の途中で改行しない */
 .group-title { font-size: 14px; margin: 12px 0 2px; }
 .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
 /* 時・分は狭いスマホでも同じ行に並べる（広い幅では他の行と同じ列幅） */
