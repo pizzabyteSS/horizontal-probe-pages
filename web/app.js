@@ -17,7 +17,7 @@
   var CONFIG = window.HZ_WEB_CONFIG || {};
   var VIEW = window.HZ_WEB_VIEW || {};
   var ENDPOINT_PATTERN = /^https:\/\/script\.google\.com\/macros\/s\/AKfyc[A-Za-z0-9_-]+\/exec$/;
-  var LIMIT_MS = { READY: 5000, COLD: 5000, MEDIAN: 3000 };   // 2026-10-16 決定（docs/web-server-plan.md §3.5）
+  var LIMIT_MS = { READY: 5000, COLD: 10000, MEDIAN: 5000 };   // 2026-11-08 緩めた（冷えた1回目10秒・中央値5秒。旧 5秒・3秒は 10-16 決定）。docs/final-check.md §1 D2・D3
   var COLD_IDLE_MINUTES = 30;
   var STREAK_COUNT = 5;
   var LAST_CALL_STORAGE_KEY = 'hzWeb.lastCallAt';
@@ -725,7 +725,12 @@
     clearDraftProblem();
     clearResult();
     if (outcome === 'removed' && fresh) showFreshResult(fresh);
-    else if (outcome === 'removed') renderMessage(target.messageId, '作業中の鑑定を端末から消しました', false);
+    else if (outcome === 'removed') {
+      // 入力欄の氏名・生年月日なども残さない（共用の端末で前の人の入力が見えないように。2026-11-10 実機確認 D7）
+      fillInputForm(SAMPLE_INPUT);
+      byId('inpName').value = '';
+      renderMessage(target.messageId, '作業中の鑑定を端末から消しました', false);
+    }
     else {
       // 別のタブ・画面が書き換えていた。そちらの作業は残し、計算し直した結果も出さない（上書きしないため）
       renderMessage(target.messageId, '画面の結果を消しました。端末の作業中の鑑定は別の画面で変わっていたため、そのまま残しています', false);
